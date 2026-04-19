@@ -1,0 +1,37 @@
+{
+  "name": "the-signal",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "convex:dev": "convex dev",
+    "convex:deploy": "convex deploy --prod"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "^7.2.3",
+    "convex": "^1.16.0",
+    "nanoid": "^5.1.0",
+    "next": "^16.2.4",
+    "react": "^19.2.5",
+    "react-awesome-loaders": "^0.1.37",
+    "react-dom": "^19.2.5",
+    "sonner": "^2.0.7",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.5",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/parser": "^8.58.2",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.4",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5.6.2"
+  }
+}
