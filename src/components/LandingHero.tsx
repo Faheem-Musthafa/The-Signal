@@ -1,5 +1,4 @@
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
-import { WifiLoader } from "react-awesome-loaders";
 
 export function LandingHero() {
   return (
@@ -113,14 +112,10 @@ export function LandingHero() {
 
           <div className="md:w-1/2 h-full flex items-center justify-center p-4">
             <div className="w-full h-32 rounded-xl bg-gradient-to-r from-white/[0.05] to-transparent border border-white/10 flex items-center justify-center shadow-inner">
-               <WifiLoader
-                 background={"transparent"}
-                 desktopSize={"60px"}
-                 mobileSize={"60px"}
-                 text={""}
-                 backColor="#222222"
-                 frontColor="#FF453A"
-               />
+              <div className="relative w-16 h-16">
+                <div className="absolute inset-0 rounded-full border-4 border-white/10"></div>
+                <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-accent border-r-accent/60 animate-spin"></div>
+              </div>
             </div>
           </div>
         </div>
