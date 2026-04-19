@@ -1,6 +1,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/toaster";
 import { Inter, Playfair_Display, DM_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next"
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -20,9 +21,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${playfair.variable} ${dmMono.variable}`}>
       <body>
+        
         <ClerkProvider>
           <Toaster />
           {children}
+          <Analytics />
         </ClerkProvider>
       </body>
     </html>
