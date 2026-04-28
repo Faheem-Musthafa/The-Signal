@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { getConvexClient } from "@/lib/convexServer";
+import { getAuthedConvexClient } from "@/lib/convexServer";
+import { api } from "../../../../../convex/_generated/api";
 
 export const runtime = "nodejs";
 
@@ -10,28 +11,8 @@ export async function GET() {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   }
 
-  const convex = getConvexClient();
-  const history = (await convex.query(
-    "digests:getTodayByAccount" as never,
-    {
-      accountId: userId,
-      limit: 8,
-    } as never,
-  )) as Array<{
-    shareId: string;
-    topics: string[];
-    stories: Array<{
-      headline: string;
-      category: string;
-      summary: string;
-      importance: number;
-      signal: string;
-      source: string;
-    }>;
-    model: string;
-    generatedAt: number;
-    topicsKey?: string;
-  }>;
+  const convex = await getAuthedConvexClient();
+  const history = await convex.query(api.digests.getTodayByAccount, { limit: 8 });
 
   const uniqueByTopics = new Map<string, (typeof history)[number]>();
   for (const item of history) {

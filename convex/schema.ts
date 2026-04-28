@@ -23,7 +23,9 @@ export default defineSchema({
   })
     .index("by_shareId", ["shareId"])
     .index("by_topicsKey_and_generatedAt", ["topicsKey", "generatedAt"])
-    .index("by_ownerAccountId_and_generatedAt", ["ownerAccountId", "generatedAt"]),
+    .index("by_ownerAccountId_and_generatedAt", ["ownerAccountId", "generatedAt"])
+    .index("by_ownerAccountId_and_topicsKey_and_generatedAt", ["ownerAccountId", "topicsKey", "generatedAt"])
+    .index("by_expiresAt", ["expiresAt"]),
 
   rateLimits: defineTable({
     ip: v.string(),
@@ -39,18 +41,27 @@ export default defineSchema({
   }).index("by_accountId_and_dayKey", ["accountId", "dayKey"]),
 
   subscribers: defineTable({
+    accountId: v.string(),
     email: v.string(),
-    timezone: v.string(),
     topics: v.array(v.string()),
+    timezone: v.string(),
     deliveryHour: v.number(),
     active: v.boolean(),
+    lastDeliveredDayKey: v.optional(v.string()),
     lastDeliveredAt: v.optional(v.number()),
-  }).index("by_email", ["email"]),
+  })
+    .index("by_accountId", ["accountId"])
+    .index("by_active_and_deliveryHour", ["active", "deliveryHour"]),
 
   emailQueue: defineTable({
+    accountId: v.string(),
     email: v.string(),
-    digestId: v.id("digests"),
+    digestId: v.optional(v.id("digests")),
     status: v.union(v.literal("pending"), v.literal("sent"), v.literal("failed")),
+    error: v.optional(v.string()),
     createdAt: v.number(),
-  }),
+  })
+    .index("by_status", ["status"])
+    .index("by_digestId", ["digestId"])
+    .index("by_createdAt", ["createdAt"]),
 });

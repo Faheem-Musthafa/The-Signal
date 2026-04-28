@@ -4,7 +4,8 @@ import { DigestRequestSchema, StorySchema } from "@/types/digest";
 import { buildDigestPrompt } from "@/lib/prompt";
 import { extractJsonArray } from "@/lib/json";
 import { runFirecrawlAndOpenRouter } from "@/lib/llm";
-import { getConvexClient } from "@/lib/convexServer";
+import { getAuthedConvexClient } from "@/lib/convexServer";
+import { api } from "../../../../convex/_generated/api";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -12,14 +13,6 @@ const DIGEST_CACHE_MAX_AGE_MS = 3 * 60 * 60 * 1000;
 
 function buildTopicsKey(topics: string[]) {
   return [...topics].sort().join("|");
-}
-
-function getClientIp(req: NextRequest) {
-  return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    req.headers.get("x-real-ip") ??
-    "unknown"
-  );
 }
 
 function sleep(ms: number) {
@@ -78,108 +71,46 @@ export async function POST(req: NextRequest) {
   const topicsKey = buildTopicsKey(topics);
   const generatedAt = new Date().toISOString();
   const prompt = buildDigestPrompt({ date: generatedAt, topics });
+  const model = process.env.PRIMARY_MODEL ?? process.env.OPENROUTER_MODEL ?? "google/gemini-2.5-flash";
 
-  const ip = getClientIp(req);
-  const convex = getConvexClient();
+  const convex = await getAuthedConvexClient();
 
+  let daily: { allowed: boolean; remaining: number; limit?: number };
   try {
-    const daily = (await convex.mutation(
-      "rateLimits:checkAndIncrementDailyByAccount" as never,
+    daily = await convex.mutation(api.rateLimits.checkAndIncrementDailyByAccount, {
+      dailyMax: 3,
+    });
+  } catch (error) {
+    console.error("Daily quota check failed", error);
+    return NextResponse.json(
+      { error: "Quota service unavailable, try again shortly" },
+      { status: 503 },
+    );
+  }
+
+  if (!daily.allowed) {
+    return NextResponse.json(
       {
-        accountId: userId,
-        dailyMax: 3,
-      } as never,
-    )) as { allowed: boolean; remaining: number; limit?: number };
-
-    if (!daily.allowed) {
-      return NextResponse.json(
-        {
-          error: "Daily limit reached (3 digests per account)",
-          remaining: 0,
-          limit: daily.limit ?? 3,
-        },
-        { status: 429 },
-      );
-    }
-
-    const max = Number(process.env.RATE_LIMIT_MAX ?? "10");
-    const windowSec = Number(process.env.RATE_LIMIT_WINDOW ?? "3600");
-    const rl = (await convex.mutation(
-      "rateLimits:checkAndIncrement" as never,
-      {
-        ip,
-        max,
-        windowMs: windowSec * 1000,
-      } as never,
-    )) as { allowed: boolean; retryAfter?: number };
-
-    if (!rl.allowed) {
-      return NextResponse.json(
-        {
-          error: "Rate limit exceeded",
-          retryAfter: rl.retryAfter ?? 0,
-        },
-        { status: 429 },
-      );
-    }
-  } catch {
-    // Rate limiting should not block digest generation in MVP.
+        error: "Daily limit reached (3 digests per account)",
+        remaining: 0,
+        limit: daily.limit ?? 3,
+      },
+      { status: 429 },
+    );
   }
 
   try {
-    const cached = (await convex.query(
-      "digests:getRecentByTopicsKey" as never,
-      {
-        topicsKey,
-        maxAgeMs: DIGEST_CACHE_MAX_AGE_MS,
-      } as never,
-    )) as
-      | {
-          stories: unknown[];
-          generatedAt: number;
-          model: string;
-          shareId: string;
-        }
-      | null;
+    const cached = await convex.query(api.digests.getRecentByTopicsKey, {
+      topicsKey,
+      maxAgeMs: DIGEST_CACHE_MAX_AGE_MS,
+    });
 
     if (cached) {
-      let cachedShareId = cached.shareId;
-      let cachedGeneratedAt = cached.generatedAt;
-      try {
-        const existingToday = (await convex.query(
-          "digests:getTodayByAccountAndTopicsKey" as never,
-          {
-            accountId: userId,
-            topicsKey,
-          } as never,
-        )) as { shareId: string; generatedAt: number } | null;
-
-        if (existingToday) {
-          cachedShareId = existingToday.shareId;
-          cachedGeneratedAt = existingToday.generatedAt;
-        } else {
-          cachedShareId = (await convex.mutation(
-            "digests:saveDigest" as never,
-            {
-              ownerAccountId: userId,
-              topics,
-              topicsKey,
-              stories: cached.stories,
-              model: cached.model,
-            } as never,
-          )) as string;
-          cachedGeneratedAt = Date.now();
-        }
-      } catch {
-        cachedShareId = cached.shareId;
-        cachedGeneratedAt = cached.generatedAt;
-      }
-
       return NextResponse.json({
         stories: cached.stories,
-        generatedAt: new Date(cachedGeneratedAt).toISOString(),
+        generatedAt: new Date(cached.generatedAt).toISOString(),
         model: cached.model,
-        shareId: cachedShareId,
+        shareId: cached.shareId,
         cached: true,
       });
     }
@@ -203,9 +134,10 @@ export async function POST(req: NextRequest) {
   let stories;
   try {
     stories = await parseStories(rawResponse);
-    if (stories.length === 0) {
+    if (stories.length < 2) {
+      console.warn(`[digest.parse] tooFewStories count=${stories.length} rawLen=${rawResponse.length}`);
       return NextResponse.json(
-        { error: "Model output parsed but contained no valid stories" },
+        { error: "Model output did not contain enough valid stories" },
         { status: 500 },
       );
     }
@@ -218,16 +150,12 @@ export async function POST(req: NextRequest) {
 
   let shareId: string | undefined;
   try {
-    shareId = (await convex.mutation(
-      "digests:saveDigest" as never,
-      {
-        ownerAccountId: userId,
-        topics,
-        topicsKey,
-        stories,
-        model: process.env.PRIMARY_MODEL ?? process.env.OPENROUTER_MODEL ?? "google/gemini-2.5-flash",
-      } as never,
-    )) as string;
+    shareId = await convex.mutation(api.digests.saveDigest, {
+      topics,
+      topicsKey,
+      stories,
+      model,
+    });
   } catch {
     shareId = undefined;
   }
@@ -235,7 +163,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     stories,
     generatedAt,
-    model: process.env.PRIMARY_MODEL ?? process.env.OPENROUTER_MODEL ?? "google/gemini-2.5-flash",
+    model,
     shareId,
   });
 }

@@ -1,16 +1,34 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/toaster";
-import { Inter, Playfair_Display, DM_Mono } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next"
+import { Fraunces, Geist, JetBrains_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
-const playfair = Playfair_Display({ subsets: ["latin"], variable: "--font-playfair" });
-const dmMono = DM_Mono({ weight: ["400", "500"], subsets: ["latin"], variable: "--font-dm-mono" });
+// Display serif — distinctive, has a beautiful italic, variable optical sizing
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-fraunces",
+  axes: ["opsz", "SOFT", "WONK"],
+  display: "swap",
+});
+
+// Body sans — Vercel's Geist, modern but characterful (not Inter)
+const geist = Geist({
+  subsets: ["latin"],
+  variable: "--font-geist",
+  display: "swap",
+});
+
+// Mono — JetBrains Mono for data, datelines, tickers
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+  display: "swap",
+});
 
 export const metadata = {
-  title: "The Signal",
-  description: "Daily tech intelligence digest",
+  title: "The Signal — Tech intelligence, distilled.",
+  description: "Real-time tech briefings. Curated by AI, refined for humans who don't have time to read everything.",
 };
 
 export default function RootLayout({
@@ -19,9 +37,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${playfair.variable} ${dmMono.variable}`}>
+    <html lang="en" className={`${fraunces.variable} ${geist.variable} ${jetbrainsMono.variable}`}>
       <body>
-        
         <ClerkProvider>
           <Toaster />
           {children}

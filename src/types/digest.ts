@@ -28,7 +28,14 @@ export const ShareRequestSchema = z.object({
   model: z.string().min(1),
 });
 
+export const SubscribeRequestSchema = z.object({
+  topics: z.array(z.enum(ALLOWED_TOPICS)).min(1).max(8),
+  timezone: z.string().min(1).max(64),
+  deliveryHour: z.number().int().min(0).max(23),
+});
+
 export type Story = z.infer<typeof StorySchema>;
 export type DigestRequest = z.infer<typeof DigestRequestSchema>;
 export type DigestResponse = z.infer<typeof DigestResponseSchema>;
 export type ShareRequest = z.infer<typeof ShareRequestSchema>;
+export type SubscribeRequest = z.infer<typeof SubscribeRequestSchema>;

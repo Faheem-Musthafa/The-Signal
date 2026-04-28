@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getConvexClient } from "@/lib/convexServer";
+import { api } from "../../../../../convex/_generated/api";
 
 export const runtime = "nodejs";
 
@@ -14,10 +15,7 @@ export async function GET(
   }
 
   const convex = getConvexClient();
-  const digest = await convex.query(
-    "digests:getByShareId" as never,
-    { shareId } as never,
-  );
+  const digest = await convex.query(api.digests.getByShareId, { shareId });
 
   if (!digest) {
     return NextResponse.json(

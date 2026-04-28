@@ -3,16 +3,25 @@ import { internal } from "./_generated/api";
 
 const crons = cronJobs();
 
-crons.daily(
+crons.interval(
   "cleanup expired digests",
-  { hourUTC: 0, minuteUTC: 0 },
+  { hours: 24 },
   internal.internal.cleanup.purgeExpiredDigests,
+  {},
 );
 
-crons.hourly(
+crons.interval(
+  "purge old email queue",
+  { hours: 24 },
+  internal.internal.cleanup.purgeOldEmailQueue,
+  {},
+);
+
+crons.interval(
   "send scheduled digests",
-  { minuteUTC: 0 },
+  { hours: 1 },
   internal.internal.subscribers.sendDueDigests,
+  {},
 );
 
 export default crons;

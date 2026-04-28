@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query, type QueryCtx } from "./_generated/server";
 
 const storyValidator = v.object({
   headline: v.string(),
@@ -11,19 +11,33 @@ const storyValidator = v.object({
   source: v.string(),
 });
 
+async function requireAccountId(ctx: QueryCtx): Promise<string> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) {
+    throw new Error("Not authenticated");
+  }
+  return identity.subject;
+}
+
+function dayStartMs(now = Date.now()): number {
+  const d = new Date(now);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
 export const saveDigest = mutation({
   args: {
-    ownerAccountId: v.optional(v.string()),
     topics: v.array(v.string()),
     stories: v.array(storyValidator),
     model: v.string(),
     topicsKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const shareId = nanoid(10);
+    const ownerAccountId = await requireAccountId(ctx);
+    const shareId = nanoid(12);
     const now = Date.now();
     await ctx.db.insert("digests", {
       shareId,
+      ownerAccountId,
       ...args,
       generatedAt: now,
       expiresAt: now + 86_400_000,
@@ -33,15 +47,36 @@ export const saveDigest = mutation({
   },
 });
 
-export const getTodayByAccount = query({
+export const saveDigestInternal = internalMutation({
   args: {
     accountId: v.string(),
+    topics: v.array(v.string()),
+    stories: v.array(storyValidator),
+    model: v.string(),
+    topicsKey: v.optional(v.string()),
+  },
+  handler: async (ctx, { accountId, ...rest }) => {
+    const shareId = nanoid(12);
+    const now = Date.now();
+    const id = await ctx.db.insert("digests", {
+      shareId,
+      ownerAccountId: accountId,
+      ...rest,
+      generatedAt: now,
+      expiresAt: now + 86_400_000,
+    });
+    return { id, shareId };
+  },
+});
+
+export const getTodayByAccount = query({
+  args: {
     limit: v.optional(v.number()),
   },
-  handler: async (ctx, { accountId, limit }) => {
-    const now = new Date();
-    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  handler: async (ctx, { limit }) => {
+    const accountId = await requireAccountId(ctx);
     const maxItems = Math.max(1, Math.min(20, limit ?? 10));
+    const dayStart = dayStartMs();
 
     const docs = await ctx.db
       .query("digests")
@@ -55,21 +90,22 @@ export const getTodayByAccount = query({
 
 export const getTodayByAccountAndTopicsKey = query({
   args: {
-    accountId: v.string(),
     topicsKey: v.string(),
   },
-  handler: async (ctx, { accountId, topicsKey }) => {
-    const now = new Date();
-    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  handler: async (ctx, { topicsKey }) => {
+    const accountId = await requireAccountId(ctx);
+    const dayStart = dayStartMs();
 
-    const docs = await ctx.db
+    const match = await ctx.db
       .query("digests")
-      .withIndex("by_ownerAccountId_and_generatedAt", (q) => q.eq("ownerAccountId", accountId).gte("generatedAt", dayStart))
+      .withIndex("by_ownerAccountId_and_topicsKey_and_generatedAt", (q) =>
+        q.eq("ownerAccountId", accountId).eq("topicsKey", topicsKey).gte("generatedAt", dayStart),
+      )
       .order("desc")
-      .take(50);
+      .first();
 
-    const match = docs.find((d) => d.topicsKey === topicsKey && d.expiresAt >= Date.now());
-    return match ?? null;
+    if (!match || match.expiresAt < Date.now()) return null;
+    return match;
   },
 });
 
@@ -109,6 +145,14 @@ export const getByShareId = query({
       return null;
     }
 
-    return digest;
+    return {
+      shareId: digest.shareId,
+      topics: digest.topics,
+      topicsKey: digest.topicsKey,
+      stories: digest.stories,
+      model: digest.model,
+      generatedAt: digest.generatedAt,
+      expiresAt: digest.expiresAt,
+    };
   },
 });

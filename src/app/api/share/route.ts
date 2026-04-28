@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { ShareRequestSchema } from "@/types/digest";
-import { getConvexClient } from "@/lib/convexServer";
+import { getAuthedConvexClient } from "@/lib/convexServer";
+import { api } from "../../../../convex/_generated/api";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -21,15 +28,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const convex = getConvexClient();
-    const shareId = (await convex.mutation(
-      "digests:saveDigest" as never,
-      {
-        topics: validated.data.topics,
-        stories: validated.data.stories,
-        model: validated.data.model,
-      } as never,
-    )) as string;
+    const convex = await getAuthedConvexClient();
+    const shareId = await convex.mutation(api.digests.saveDigest, {
+      topics: validated.data.topics,
+      stories: validated.data.stories,
+      model: validated.data.model,
+    });
 
     return NextResponse.json({ shareId });
   } catch (error) {

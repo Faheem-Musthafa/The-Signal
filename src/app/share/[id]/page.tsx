@@ -1,6 +1,15 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getConvexClient } from "@/lib/convexServer";
-import type { DigestResponse } from "@/types/digest";
+import { api } from "../../../../convex/_generated/api";
+
+function Mark() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 12c4 0 4-6 8-6s4 12 8 12 4-6 4-6" />
+    </svg>
+  );
+}
 
 export default async function SharePage({
   params,
@@ -9,123 +18,114 @@ export default async function SharePage({
 }) {
   const { id } = await params;
   const convex = getConvexClient();
+  const digest = await convex.query(api.digests.getByShareId, { shareId: id });
 
-  const digest = await convex.query("digests:getByShareId" as never, {
-    shareId: id,
-  } as never) as DigestResponse | null;
-
-  if (!digest) {
-    notFound();
-  }
+  if (!digest) notFound();
 
   return (
-    <main className="min-h-screen bg-bg text-white px-4 py-16 md:py-24">
-      <div className="max-w-6xl mx-auto">
-        <header className="flex flex-col md:flex-row items-start md:items-end justify-between mb-16 gap-6 border-b border-white/5 pb-8">
-          <div>
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg glass-panel text-text-muted text-xs font-bold uppercase tracking-widest mb-4">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-              Shared Intelligence Briefing
+    <main className="min-h-screen bg-bg text-text relative overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[300px] bg-accent/8 blur-[120px] rounded-full opacity-40" />
+      </div>
+
+      <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 py-10 md:py-14">
+        <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-12 pb-8 border-b border-border">
+          <div className="flex items-start gap-4">
+            <div className="w-9 h-9 rounded-lg bg-accent-soft text-accent flex items-center justify-center shrink-0 mt-1">
+              <Mark />
             </div>
-            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-3">The Signal</h1>
-            <p className="text-text-muted text-sm font-medium flex flex-wrap items-center gap-2">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-              {new Date(digest.generatedAt).toLocaleString()}
-              <span className="text-border px-2 hidden md:inline">|</span>
-              <span className="text-accent/80 border border-accent/20 bg-accent/10 px-2 py-0.5 rounded-md text-[10px] uppercase font-bold tracking-wider">{digest.model}</span>
-            </p>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-dim mb-1.5">
+                Shared briefing · The Signal
+              </p>
+              <h1 className="text-3xl md:text-4xl font-semibold tracking-tight mb-3">
+                {new Date(digest.generatedAt).toLocaleDateString("en-US", {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </h1>
+              <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-text-dim">
+                <span>{new Date(digest.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                <span className="text-text-dim/40">·</span>
+                <span className="text-accent">{digest.model}</span>
+                <span className="text-text-dim/40">·</span>
+                <span>{digest.topics.join(" · ")}</span>
+              </div>
+            </div>
           </div>
-          
-          <a 
+
+          <Link
             href="/"
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-accent text-white rounded-xl text-sm font-bold shadow-[0_0_20px_rgba(99,102,241,0.2)] hover:bg-accent-hover hover:-translate-y-0.5 transition-all w-full md:w-auto"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-accent text-white font-semibold text-sm hover:bg-accent-hover transition-colors"
           >
-            Create Your Own Radar
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            Get your own briefing
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M5 12h14"></path>
               <path d="m12 5 7 7-7 7"></path>
             </svg>
-          </a>
+          </Link>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {digest.stories.map((story, i) => {
             const isHero = i === 0;
-
             return (
-              <article 
-                key={i} 
-                className={`glass-panel p-6 md:p-8 rounded-3xl relative overflow-hidden group flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-accent/5 hover:border-accent/30 ${
-                  isHero ? "md:col-span-2 lg:col-span-3 bg-gradient-to-br from-surface to-surface/40 border-accent/20" : ""
+              <article
+                key={i}
+                className={`elev-1 rounded-xl p-6 flex flex-col group hover:border-border-strong transition-all ${
+                  isHero ? "md:col-span-2 lg:col-span-3" : ""
                 }`}
               >
-                {isHero && <div className="absolute top-0 right-0 w-96 h-96 bg-accent/10 rounded-full blur-[100px] pointer-events-none" />}
-                
-                <div className="flex items-center justify-between mb-6 relative z-10">
+                <div className="flex items-center justify-between mb-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className={`inline-block px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest border ${
-                      isHero ? "bg-accent/20 text-accent border-accent/30" : "bg-surface-2 text-text-muted border-white/5"
+                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${
+                      isHero ? "bg-accent-soft text-accent border border-accent/20" : "bg-surface border border-border text-text-muted"
                     }`}>
                       {story.category}
                     </span>
-                    <span className="inline-flex px-2 py-1 bg-surface-2 border border-white/5 rounded-md text-[10px] font-semibold text-text-muted">
-                      {story.source}
-                    </span>
+                    <span className="text-[11px] text-text-dim">{story.source}</span>
                   </div>
-                  
+
                   <div className="flex gap-1" title={`Importance: ${story.importance}/5`}>
                     {Array.from({ length: 5 }).map((_, j) => (
-                      <svg 
-                        key={j} 
-                        width="12" height="12" viewBox="0 0 24 24" 
-                        fill={j < story.importance ? "var(--accent-warm)" : "none"} 
-                        stroke={j < story.importance ? "var(--accent-warm)" : "currentColor"} 
-                        strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                        className={j < story.importance ? "opacity-100 drop-shadow-[0_0_5px_var(--accent-warm)]" : "opacity-20 text-text-muted"}
-                      >
-                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                      </svg>
+                      <div
+                        key={j}
+                        className={`w-1 h-1 rounded-full ${j < story.importance ? "bg-accent-warm" : "bg-surface-3"}`}
+                      />
                     ))}
                   </div>
                 </div>
-                
-                <h2 className={`font-bold mb-5 leading-tight tracking-tight relative z-10 ${
-                  isHero ? "text-3xl md:text-5xl" : "text-xl md:text-2xl"
+
+                <h2 className={`font-semibold mb-4 leading-snug tracking-tight ${
+                  isHero ? "text-2xl md:text-4xl max-w-3xl" : "text-base"
                 }`}>
                   {story.headline}
                 </h2>
-                
-                <div className={`rounded-2xl border relative z-10 ${
-                  isHero ? "bg-accent/10 border-accent/30 p-6 md:p-8 mb-6" : "bg-surface-2/50 border-white/5 p-5 mb-5 mt-auto"
-                }`}>
-                  <p className="text-[10px] font-black uppercase text-accent mb-3 tracking-[0.2em] flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                    The Signal
-                  </p>
-                  <p className={`font-semibold leading-relaxed text-white ${
-                    isHero ? "text-xl md:text-2xl" : "text-base"
-                  }`}>
+
+                <div className="rounded-lg border border-border bg-bg p-4 mb-4 mt-auto">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-accent mb-2">The Signal</p>
+                  <p className={`font-medium leading-relaxed text-text ${isHero ? "text-base md:text-lg" : "text-sm"}`}>
                     {story.signal}
                   </p>
                 </div>
-                
-                <p className={`leading-relaxed text-text-muted relative z-10 ${
-                  isHero ? "text-lg max-w-4xl" : "text-sm"
-                }`}>
+
+                <p className={`leading-relaxed text-text-muted ${isHero ? "text-sm md:text-base max-w-3xl" : "text-xs"}`}>
                   {story.summary}
                 </p>
               </article>
             );
           })}
         </div>
-        
-        <footer className="mt-16 text-center text-text-muted text-sm font-medium">
-          <p>
+
+        <footer className="mt-16 pt-8 border-t border-border flex items-center justify-between text-xs text-text-dim">
+          <span>
             Powered by{" "}
-            <a href="/" className="text-white hover:text-accent transition-colors underline decoration-white/20 underline-offset-4">
+            <Link href="/" className="text-text hover:text-accent transition-colors">
               The Signal
-            </a>
-          </p>
+            </Link>
+          </span>
+          <span className="font-mono">/share/{id.slice(0, 8)}</span>
         </footer>
       </div>
     </main>

@@ -280,11 +280,12 @@ export async function runFirecrawlAndOpenRouter(topics: Topic[], prompt: string)
       console.warn(
         `[digest.llm] modelFallback model=${model} status=${result.status} reason=${truncateText(result.body ?? "", 240)}`,
       );
-      lastError = new Error(`OpenRouter failed: ${result.status} ${result.body ?? ""}`);
+      lastError = new Error(`OpenRouter unavailable (status ${result.status})`);
       continue;
     }
 
-    throw new Error(`OpenRouter failed: ${result.status} ${result.body ?? ""}`);
+    console.error(`[digest.llm] openRouterError model=${model} status=${result.status} body=${truncateText(result.body ?? "", 500)}`);
+    throw new Error(`OpenRouter request failed (status ${result.status})`);
   }
 
   throw lastError ?? new Error("OpenRouter failed for all model candidates");

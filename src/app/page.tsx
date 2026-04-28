@@ -6,20 +6,20 @@ import { toast } from "sonner";
 import { ALLOWED_TOPICS, type Topic } from "@/lib/topics";
 import type { DigestResponse } from "@/types/digest";
 
-import { Background } from "@/components/Background";
+import { AppShell } from "@/components/AppShell";
 import { LandingHero } from "@/components/LandingHero";
-import { RadarConfig } from "@/components/RadarConfig";
+import { DashboardView } from "@/components/DashboardView";
 import { LoadingBriefing } from "@/components/LoadingBriefing";
 import { BriefingResult } from "@/components/BriefingResult";
 
 const TOPIC_STORAGE_KEY = "signal:selectedTopics";
 const DEFAULT_TOPICS: Topic[] = ["AI & LLMs", "Startup Funding", "Big Tech"];
 const LOADING_MESSAGES = [
-  "Igniting neural engines...",
-  "Scanning the live web...",
-  "Distilling intelligence...",
-  "Formatting your briefing...",
-  "Almost ready...",
+  "Igniting neural engines…",
+  "Scanning the live web…",
+  "Distilling intelligence…",
+  "Formatting your briefing…",
+  "Almost ready…",
 ];
 
 async function parseApiResponse(res: Response) {
@@ -56,26 +56,25 @@ export default function HomePage() {
   const [digest, setDigest] = useState<DigestResponse | null>(null);
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const [generationsToday, setGenerationsToday] = useState(0);
-  const [previouslyCrawled, setPreviouslyCrawled] = useState<Array<{ shareId: string; generatedAt: string; topics: string[]; cached?: boolean }>>([]);
+  const [recent, setRecent] = useState<Array<{ shareId: string; generatedAt: string; topics: string[]; cached?: boolean }>>([]);
 
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(TOPIC_STORAGE_KEY);
-      if (!raw) return;
-
-      const parsed = JSON.parse(raw) as unknown;
-      if (!Array.isArray(parsed)) return;
-
-      const sanitized = parsed.filter(
-        (item): item is Topic =>
-          typeof item === "string" && (ALLOWED_TOPICS as readonly string[]).includes(item),
-      );
-
-      if (sanitized.length >= 1 && sanitized.length <= 8) {
-        setSelectedTopics(sanitized);
+      if (raw) {
+        const parsed = JSON.parse(raw) as unknown;
+        if (Array.isArray(parsed)) {
+          const sanitized = parsed.filter(
+            (item): item is Topic =>
+              typeof item === "string" && (ALLOWED_TOPICS as readonly string[]).includes(item),
+          );
+          if (sanitized.length >= 1 && sanitized.length <= 8) {
+            setSelectedTopics(sanitized);
+          }
+        }
       }
     } catch {
-      // Ignore malformed localStorage values and keep defaults.
+      // ignore malformed values, keep defaults
     }
 
     try {
@@ -113,17 +112,17 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) {
-      setPreviouslyCrawled([]);
+      setRecent([]);
       return;
     }
 
     const loadHistory = async () => {
       try {
-        const res = await fetch("/api/digest/history", { method: "GET" });
+        const res = await fetch("/api/digest/history");
         const data = await parseApiResponse(res);
         if (!res.ok) return;
         const items = Array.isArray(data.items) ? data.items : [];
-        setPreviouslyCrawled(
+        setRecent(
           items.map((item) => ({
             shareId: String(item.shareId ?? ""),
             generatedAt: String(item.generatedAt ?? new Date().toISOString()),
@@ -132,7 +131,7 @@ export default function HomePage() {
           })).filter((i) => i.shareId),
         );
       } catch {
-        // Ignore history errors; primary flow should stay usable.
+        // soft fail; primary flow stays usable
       }
     };
 
@@ -141,9 +140,7 @@ export default function HomePage() {
 
   const toggleTopic = (topic: Topic) => {
     setSelectedTopics((prev) => {
-      if (prev.includes(topic)) {
-        return prev.filter((t) => t !== topic);
-      }
+      if (prev.includes(topic)) return prev.filter((t) => t !== topic);
       if (prev.length >= 8) return prev;
       return [...prev, topic];
     });
@@ -168,26 +165,28 @@ export default function HomePage() {
       if (!res.ok) throw new Error((data.error as string) || "Failed to generate digest");
       const normalized = normalizeDigestResponse(data);
       setDigest(normalized);
-      toast.success("Briefing generated successfully!");
+      toast.success("Briefing generated");
 
       const digestShareId = typeof data.shareId === "string" ? data.shareId : "";
       if (digestShareId) {
-        setPreviouslyCrawled((prev) => [
-          {
-            shareId: digestShareId,
-            generatedAt: normalized.generatedAt,
-            topics: [...selectedTopics],
-            cached: normalized.cached,
-          },
-          ...prev.filter((p) => p.shareId !== digestShareId),
-        ].slice(0, 8));
+        setRecent((prev) =>
+          [
+            {
+              shareId: digestShareId,
+              generatedAt: normalized.generatedAt,
+              topics: [...selectedTopics],
+              cached: normalized.cached,
+            },
+            ...prev.filter((p) => p.shareId !== digestShareId),
+          ].slice(0, 8),
+        );
       }
 
       const newCount = generationsToday + 1;
       setGenerationsToday(newCount);
       window.localStorage.setItem("signal:usage", JSON.stringify({ date: new Date().toDateString(), count: newCount }));
-    } catch (err: any) {
-      const message = err.message || "An unknown error occurred";
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "An unknown error occurred";
       setError(message);
       toast.error(message);
     } finally {
@@ -199,12 +198,12 @@ export default function HomePage() {
     if (!digest) return;
     if (digest.shareId) {
       navigator.clipboard.writeText(`${window.location.origin}/share/${digest.shareId}`);
-      toast.success("Link copied to clipboard!");
+      toast.success("Link copied");
       return;
     }
-    
+
     try {
-      const toastId = toast.loading("Generating secure share link...");
+      const toastId = toast.loading("Generating share link…");
       const res = await fetch("/api/share", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -216,15 +215,15 @@ export default function HomePage() {
       });
       const data = await parseApiResponse(res);
       if (!res.ok) throw new Error((data.error as string) || "Failed to generate share link");
-      
+
       const nextShareId = String(data.shareId ?? "");
       if (!nextShareId) throw new Error("Failed to generate share link");
 
       setDigest({ ...digest, shareId: nextShareId });
       navigator.clipboard.writeText(`${window.location.origin}/share/${nextShareId}`);
-      toast.success("Link copied to clipboard!", { id: toastId });
-    } catch (err: any) {
-      toast.error(err.message || "Failed to generate share link");
+      toast.success("Link copied", { id: toastId });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to generate share link");
     }
   };
 
@@ -232,66 +231,57 @@ export default function HomePage() {
     try {
       const res = await fetch(`/api/share/${shareId}`);
       const data = await parseApiResponse(res);
-      if (!res.ok) throw new Error((data.error as string) || "Failed to load previous digest");
+      if (!res.ok) throw new Error((data.error as string) || "Failed to load briefing");
       setDigest(normalizeDigestResponse(data));
-    } catch (err: any) {
-      toast.error(err.message || "Failed to load previous digest");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load briefing");
     }
   };
 
-  // Avoid auth-state flicker on refresh: wait until Clerk resolves session.
+  // Wait for Clerk before deciding
   if (!isLoaded) {
     return (
-      <main className="relative min-h-screen flex flex-col items-center justify-center px-4 overflow-hidden bg-[#0A0A0A]">
-        <Background />
-        <div className="relative z-10 glass-card px-8 py-6 rounded-2xl text-sm text-white/80">
-          Restoring your session...
-        </div>
-      </main>
+      <div className="min-h-screen bg-paper flex items-center justify-center">
+        <div className="border-2 border-ink bg-paper-card px-6 py-4 dateline">Restoring your session…</div>
+      </div>
     );
   }
 
-  // 1) Topic Config View & Landing Page
-  if (!digest && !loading) {
-    return (
-      <main className="relative min-h-screen flex flex-col items-center justify-center px-4 py-16 overflow-hidden bg-[#0A0A0A]">
-        <Background />
-        {!isSignedIn ? (
-          <LandingHero />
-        ) : (
-          <RadarConfig
-            selectedTopics={selectedTopics}
-            toggleTopic={toggleTopic}
-            handleGenerate={handleGenerate}
-            generationsToday={generationsToday}
-            error={error}
-            previouslyCrawled={previouslyCrawled}
-            openPreviousDigest={openPreviousDigest}
-          />
-        )}
-      </main>
-    );
+  // Unauth: marketing landing, no shell
+  if (!isSignedIn) {
+    return <LandingHero />;
   }
 
-  // 2) Loading View
+  // Authed: render dashboard / loading / result inside the shell
+  let body: React.ReactNode;
+  let pageTitle = "Dashboard";
+  let pageDescription: string | undefined = "Generate a real-time briefing or schedule a daily digest";
+
   if (loading) {
-    return (
-      <main className="relative min-h-screen flex flex-col items-center justify-center px-4 overflow-hidden bg-[#0A0A0A]">
-        <Background />
-        <LoadingBriefing message={LOADING_MESSAGES[loadingMessageIndex]} />
-      </main>
+    body = <LoadingBriefing message={LOADING_MESSAGES[loadingMessageIndex]} />;
+    pageTitle = "Generating…";
+    pageDescription = "Synthesizing your briefing in real time";
+  } else if (digest) {
+    body = <BriefingResult digest={digest} handleShare={handleShare} resetDigest={() => setDigest(null)} />;
+    pageTitle = "Briefing";
+    pageDescription = undefined;
+  } else {
+    body = (
+      <DashboardView
+        selectedTopics={selectedTopics}
+        toggleTopic={toggleTopic}
+        handleGenerate={handleGenerate}
+        generationsToday={generationsToday}
+        error={error}
+        recent={recent}
+        openPreviousDigest={openPreviousDigest}
+      />
     );
   }
 
-  // 3) Result View
   return (
-    <main className="relative min-h-screen px-4 py-16 md:py-24 overflow-hidden bg-[#0A0A0A]">
-      <Background />
-      <BriefingResult
-        digest={digest!}
-        handleShare={handleShare}
-        resetDigest={() => setDigest(null)}
-      />
-    </main>
+    <AppShell pageTitle={pageTitle} pageDescription={pageDescription} quotaUsed={generationsToday}>
+      {body}
+    </AppShell>
   );
 }

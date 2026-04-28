@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import {
   getAvailableOpenRouterModels,
   getOpenRouterModelCandidates,
@@ -9,6 +10,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
   const requiredEnv = ["OPENROUTER_API_KEY", "FIRECRAWL_API_KEY"];
   const missingEnv = requiredEnv.filter((name) => !process.env[name]);
   const modelCandidates = getOpenRouterModelCandidates();
