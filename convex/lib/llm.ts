@@ -167,13 +167,39 @@ async function runOpenRouterCompletion(model: string, prompt: string, maxTokens:
 }
 
 function shouldTryNextModel(status: number, body: string | undefined): boolean {
-  if (status === 404 || status === 503) return true;
+  // Retryable per-model failures: missing model, provider down, rate limited.
+  if ([404, 429, 500, 502, 503].includes(status)) return true;
   return /No endpoints found|provider unavailable|model.*not found/i.test(body ?? "");
 }
 
-function buildDigestPrompt(date: string, topics: string[]): string {
+// Keep in sync with src/lib/prompt.ts (Convex actions cannot import from src/).
+function buildDigestPrompt(date: string, topics: string[], context: string): string {
   const topicList = topics.join(", ");
-  return `You are a sharp tech news analyst. Today is ${date}.\n\nSearch the web and find the 5-7 most important tech news stories published in the last 24 hours on the following topics: ${topicList}.\n\nFor each story, return a JSON object with these exact fields:\n- headline: string - journalistic, punchy, max 12 words\n- category: string - must be one of: ${topicList}\n- summary: string - 2-3 sentences: what happened AND why it matters\n- importance: integer 1-5 - (5 = affects millions/changes industry, 1 = minor)\n- signal: string - ONE key insight starting with a verb, max 20 words\n- source: string - publication or website name\n\nRules:\n- Only include stories from the last 24-48 hours. No older news.\n- Deduplicate: if two sources cover the same story, pick the most authoritative.\n- Rank by importance (highest first).\n- Do NOT fabricate. Only include real, verifiable stories found via web search.\n\nReturn ONLY a valid JSON array. No markdown fences, no preamble, no explanation. Example: [{"headline":"...","category":"...","summary":"...","importance":4,"signal":"...","source":"..."}]`;
+  return `You are the senior editor of "The Signal", a daily tech intelligence briefing read by founders, engineers, and investors. The current UTC timestamp is ${date}.
+
+You are given SOURCE MATERIAL at the end of this message: a JSON array of scraped news search results (title, description, url, publishedAt, snippet). Work strictly from that material.
+
+TASK: select the 5-7 most important stories covering these topics: ${topicList}.
+
+Selection rules:
+- Use only stories supported by the source material. NEVER invent stories, numbers, or names. If the material supports fewer than 5 solid stories, return fewer — quality over count.
+- Skip stories older than ~48 hours relative to the timestamp above (use publishedAt when present).
+- Deduplicate aggressively: multiple items covering the same event become ONE story; credit the most authoritative source.
+- Prefer primary events (launches, funding rounds, layoffs, regulation, breaches, earnings) over commentary, listicles, or roundups.
+
+For each story return a JSON object with EXACTLY these fields:
+- headline: punchy newsroom headline, max 12 words, no clickbait
+- category: exactly one of: ${topicList}
+- summary: 2-3 sentences — first what happened with concrete numbers and names from the material, then why it matters
+- importance: integer 1-5 — 5 = industry-changing or affects millions; 4 = major move by a major player; 3 = notable but niche; 2 = incremental update; 1 = minor
+- signal: the ONE non-obvious takeaway an operator should act on, starting with a verb, max 20 words. Good: "Expect agent-tooling prices to drop as Google undercuts OpenAI." Bad: "This is big news for AI."
+- source: publication name (e.g. "TechCrunch"), never a URL
+
+Output ONLY a valid JSON array sorted by importance descending. No markdown fences, no preamble, no trailing text.
+Example shape: [{"headline":"...","category":"...","summary":"...","importance":4,"signal":"...","source":"..."}]
+
+SOURCE MATERIAL:
+${context}`;
 }
 
 function extractJsonArray(text: string): string | null {
@@ -209,6 +235,27 @@ function parseStories(rawText: string): GeneratedStory[] {
     }));
 }
 
+async function runFirecrawlSearches(queries: string[], apiKey: string): Promise<unknown[]> {
+  // One failed query must not kill the whole briefing — use what succeeded.
+  const settled = await Promise.allSettled(queries.map((q) => runFirecrawlSearch(q, apiKey)));
+
+  const succeeded = settled
+    .filter((r): r is PromiseFulfilledResult<unknown> => r.status === "fulfilled")
+    .map((r) => r.value);
+
+  const failed = settled.length - succeeded.length;
+  if (failed > 0) {
+    console.warn(`[newsletter.llm] firecrawlPartialFailure failed=${failed}/${settled.length}`);
+  }
+
+  if (succeeded.length === 0) {
+    const first = settled.find((r): r is PromiseRejectedResult => r.status === "rejected");
+    throw first?.reason instanceof Error ? first.reason : new Error("All Firecrawl searches failed");
+  }
+
+  return succeeded;
+}
+
 export async function generateDigestStories(topics: string[]): Promise<{ stories: GeneratedStory[]; model: string }> {
   const firecrawlKey = requireEnv("FIRECRAWL_API_KEY");
   const openRouterKey = requireEnv("OPENROUTER_API_KEY");
@@ -216,10 +263,10 @@ export async function generateDigestStories(topics: string[]): Promise<{ stories
   const queries = topics.flatMap((topic) => TOPIC_QUERY_MAP[topic] ?? []);
   if (queries.length === 0) throw new Error("No queries derived from topics");
 
-  const searchResults = await Promise.all(queries.map((q) => runFirecrawlSearch(q, firecrawlKey)));
+  const searchResults = await runFirecrawlSearches(queries, firecrawlKey);
   const context = buildCompactContext(searchResults);
   const date = new Date().toISOString();
-  const prompt = `${buildDigestPrompt(date, topics)}\n\nUse this scraped context first:\n${context}`;
+  const prompt = buildDigestPrompt(date, topics, context);
 
   const candidates = getModelCandidates();
   const maxTokens = resolveMaxTokens();
@@ -229,7 +276,12 @@ export async function generateDigestStories(topics: string[]): Promise<{ stories
     const result = await runOpenRouterCompletion(model, prompt, maxTokens, openRouterKey);
 
     if (result.ok) {
-      const stories = parseStories(result.content ?? "");
+      if (!result.content?.trim()) {
+        console.warn(`[newsletter.llm] emptyCompletion model=${model}, trying next candidate`);
+        lastError = new Error(`Model ${model} returned an empty completion`);
+        continue;
+      }
+      const stories = parseStories(result.content);
       if (stories.length < 2) {
         throw new Error(`Model ${model} returned only ${stories.length} valid stories`);
       }

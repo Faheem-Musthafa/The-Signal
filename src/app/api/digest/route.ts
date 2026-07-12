@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { DigestRequestSchema, StorySchema } from "@/types/digest";
-import { buildDigestPrompt } from "@/lib/prompt";
 import { extractJsonArray } from "@/lib/json";
 import { runFirecrawlAndOpenRouter } from "@/lib/llm";
 import { getAuthedConvexClient } from "@/lib/convexServer";
@@ -70,10 +69,28 @@ export async function POST(req: NextRequest) {
   const { topics } = validated.data;
   const topicsKey = buildTopicsKey(topics);
   const generatedAt = new Date().toISOString();
-  const prompt = buildDigestPrompt({ date: generatedAt, topics });
-  const model = process.env.PRIMARY_MODEL ?? process.env.OPENROUTER_MODEL ?? "google/gemini-2.5-flash";
 
   const convex = await getAuthedConvexClient();
+
+  // Serve cache first: a cached briefing must not consume daily quota.
+  try {
+    const cached = await convex.query(api.digests.getRecentByTopicsKey, {
+      topicsKey,
+      maxAgeMs: DIGEST_CACHE_MAX_AGE_MS,
+    });
+
+    if (cached) {
+      return NextResponse.json({
+        stories: cached.stories,
+        generatedAt: new Date(cached.generatedAt).toISOString(),
+        model: cached.model,
+        shareId: cached.shareId,
+        cached: true,
+      });
+    }
+  } catch {
+    // Cache lookup failure should not block digest generation.
+  }
 
   let daily: { allowed: boolean; remaining: number; limit?: number };
   try {
@@ -99,34 +116,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  try {
-    const cached = await convex.query(api.digests.getRecentByTopicsKey, {
-      topicsKey,
-      maxAgeMs: DIGEST_CACHE_MAX_AGE_MS,
-    });
-
-    if (cached) {
-      return NextResponse.json({
-        stories: cached.stories,
-        generatedAt: new Date(cached.generatedAt).toISOString(),
-        model: cached.model,
-        shareId: cached.shareId,
-        cached: true,
-      });
-    }
-  } catch {
-    // Cache lookup failure should not block digest generation.
-  }
-
   let rawResponse = "";
+  let model = process.env.OPENROUTER_MODEL ?? "google/gemini-2.5-flash";
   try {
-    rawResponse = await runFirecrawlAndOpenRouter(topics, prompt);
+    ({ content: rawResponse, model } = await runFirecrawlAndOpenRouter(topics, generatedAt));
   } catch (upstreamError) {
+    // Config errors (missing/swapped keys) won't heal in 5 seconds — fail fast.
+    const message = upstreamError instanceof Error ? upstreamError.message : "Upstream failed";
+    if (/env var|appears to be/.test(message)) {
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
     await sleep(5000);
     try {
-      rawResponse = await runFirecrawlAndOpenRouter(topics, prompt);
+      ({ content: rawResponse, model } = await runFirecrawlAndOpenRouter(topics, generatedAt));
     } catch {
-      const message = upstreamError instanceof Error ? upstreamError.message : "Upstream failed";
       return NextResponse.json({ error: message }, { status: 503 });
     }
   }

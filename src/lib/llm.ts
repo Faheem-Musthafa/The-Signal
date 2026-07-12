@@ -1,4 +1,5 @@
 import { TOPIC_QUERY_MAP, type Topic } from "@/lib/topics";
+import { buildDigestPrompt } from "@/lib/prompt";
 
 const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/search";
 const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
@@ -240,14 +241,41 @@ async function runOpenRouterCompletion(
 }
 
 function shouldTryNextModel(status: number, body: string | undefined) {
-  if (status === 404 || status === 503) {
+  // Retryable per-model failures: missing model, provider down, rate limited.
+  if ([404, 429, 500, 502, 503].includes(status)) {
     return true;
   }
 
   return /No endpoints found|provider unavailable|model.*not found/i.test(body ?? "");
 }
 
-export async function runFirecrawlAndOpenRouter(topics: Topic[], prompt: string) {
+async function runFirecrawlSearches(queries: string[], apiKey: string) {
+  // One failed query must not kill the whole briefing — use what succeeded.
+  const settled = await Promise.allSettled(
+    queries.map((query) => runFirecrawlSearch(query, apiKey)),
+  );
+
+  const succeeded = settled
+    .filter((r): r is PromiseFulfilledResult<unknown> => r.status === "fulfilled")
+    .map((r) => r.value);
+
+  const failed = settled.length - succeeded.length;
+  if (failed > 0) {
+    console.warn(`[digest.llm] firecrawlPartialFailure failed=${failed}/${settled.length}`);
+  }
+
+  if (succeeded.length === 0) {
+    const first = settled.find((r): r is PromiseRejectedResult => r.status === "rejected");
+    throw first?.reason instanceof Error ? first.reason : new Error("All Firecrawl searches failed");
+  }
+
+  return succeeded;
+}
+
+export async function runFirecrawlAndOpenRouter(
+  topics: Topic[],
+  date: string,
+): Promise<{ content: string; model: string }> {
   const firecrawlApiKey = requireEnv("FIRECRAWL_API_KEY");
   const openRouterApiKey = requireEnv("OPENROUTER_API_KEY");
   assertProviderKeyShape(firecrawlApiKey, openRouterApiKey);
@@ -255,12 +283,10 @@ export async function runFirecrawlAndOpenRouter(topics: Topic[], prompt: string)
   const maxTokens = resolveOpenRouterMaxTokens();
 
   const queries = topics.flatMap((topic) => TOPIC_QUERY_MAP[topic]);
-  const searchResults = await Promise.all(
-    queries.map((query) => runFirecrawlSearch(query, firecrawlApiKey)),
-  );
+  const searchResults = await runFirecrawlSearches(queries, firecrawlApiKey);
 
   const context = buildCompactContext(searchResults);
-  const finalPrompt = `${prompt}\n\nUse this scraped context first:\n${context}`;
+  const finalPrompt = buildDigestPrompt({ date, topics, context });
 
   console.info(
     `[digest.llm] queries=${queries.length} contextChars=${context.length} promptChars=${finalPrompt.length} maxTokens=${maxTokens} modelCandidates=${modelCandidates.join(",")}`,
@@ -272,8 +298,13 @@ export async function runFirecrawlAndOpenRouter(topics: Topic[], prompt: string)
     const result = await runOpenRouterCompletion(model, finalPrompt, maxTokens, openRouterApiKey);
 
     if (result.ok) {
+      if (!result.content?.trim()) {
+        console.warn(`[digest.llm] emptyCompletion model=${model}, trying next candidate`);
+        lastError = new Error(`Model ${model} returned an empty completion`);
+        continue;
+      }
       console.info(`[digest.llm] selectedModel=${model}`);
-      return result.content ?? "";
+      return { content: result.content, model };
     }
 
     if (shouldTryNextModel(result.status, result.body)) {
