@@ -9,7 +9,7 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "convex:dev": "convex dev",
-    "convex:deploy": "convex deploy --prod"
+    "convex:deploy": "convex deploy"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.2.3",
