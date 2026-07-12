@@ -92,37 +92,42 @@ export function AppShell({ children, pageTitle, pageDescription, rightSlot, quot
     <div className="min-h-screen bg-paper text-ink">
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-40 h-screen w-[260px] border-r border-rule-bold bg-paper-soft flex flex-col transition-transform duration-200 ${
+        className={`fixed top-0 left-0 z-40 h-screen w-[260px] border-r border-rule bg-paper flex flex-col transition-transform duration-200 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         } md:translate-x-0`}
       >
         {/* Masthead */}
-        <div className="px-5 pt-6 pb-5 border-b-2 border-ink">
-          <div className="flex items-center gap-2.5 mb-2">
-            <span className="text-signal"><SignalGlyph size={22} /></span>
-            <span className="font-display text-[20px] font-semibold tracking-tight leading-none">
-              The Signal
+        <div className="px-5 pt-6 pb-5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-signal text-white">
+              <SignalGlyph size={18} />
             </span>
+            <div>
+              <span className="block text-[16px] font-semibold tracking-tight leading-none">
+                The Signal
+              </span>
+              <span className="block mt-1 text-[11px] text-ink-mute leading-none">
+                Tech intelligence
+              </span>
+            </div>
           </div>
-          <div className="dateline">Editorial Wire Service</div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-4 py-6">
-          <p className="px-2 dateline mb-4">Workspace</p>
-          <ul className="space-y-1">
+        <nav className="flex-1 overflow-y-auto px-3 py-4">
+          <p className="px-3 mb-2 text-[11px] font-medium uppercase tracking-wider text-ink-dim">Workspace</p>
+          <ul className="space-y-0.5">
             {NAV_ITEMS.map((item) => {
               const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
               return (
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className={`flex items-center gap-3 px-3 py-2.5 text-[14px] font-medium transition-colors relative ${
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13.5px] font-medium transition-colors ${
                       isActive
-                        ? "text-ink bg-paper-card"
-                        : "text-ink-mute hover:text-ink hover:bg-paper-card/60"
+                        ? "text-signal bg-signal-soft"
+                        : "text-ink-mute hover:text-ink hover:bg-paper-deep"
                     }`}
                   >
-                    {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-signal" />}
                     <span className={isActive ? "text-signal" : "text-ink-dim"}>{item.icon}</span>
                     {item.label}
                   </Link>
@@ -132,27 +137,27 @@ export function AppShell({ children, pageTitle, pageDescription, rightSlot, quot
           </ul>
         </nav>
 
-        <div className="px-4 py-5 border-t border-rule-bold bg-paper-card">
+        <div className="px-4 py-4 border-t border-rule">
           {usage !== null && (
-            <div className="mb-4">
-              <div className="flex items-center justify-between dateline mb-2">
-                <span>Daily quota</span>
-                <span className="text-ink">{usage}/{quotaLimit}</span>
+            <div className="mb-4 rounded-xl border border-rule bg-paper-soft p-3">
+              <div className="flex items-center justify-between mb-2 text-[11px] font-medium">
+                <span className="text-ink-mute">Daily quota</span>
+                <span className="text-ink tabular-nums">{usage}/{quotaLimit}</span>
               </div>
-              <div className="h-[3px] bg-rule overflow-hidden">
+              <div className="h-1.5 rounded-full bg-paper-deep overflow-hidden">
                 <div
-                  className="h-full bg-signal transition-all"
+                  className="h-full rounded-full bg-signal transition-all"
                   style={{ width: `${Math.min(100, (usage / quotaLimit) * 100)}%` }}
                 />
               </div>
-              <p className="mt-2 text-[10px] text-ink-mute font-mono">
+              <p className="mt-2 text-[11px] text-ink-mute">
                 {remaining} {remaining === 1 ? "briefing" : "briefings"} left today
               </p>
             </div>
           )}
           <div className="flex items-center justify-between gap-2">
             <UserButton appearance={{ elements: { avatarBox: "w-7 h-7" } }} />
-            <span className="dateline">v1.0</span>
+            <span className="text-[11px] text-ink-dim">v1.0</span>
           </div>
         </div>
       </aside>
@@ -167,12 +172,12 @@ export function AppShell({ children, pageTitle, pageDescription, rightSlot, quot
       )}
 
       {/* Main */}
-      <div className="md:pl-[260px]">
-        <header className="sticky top-0 z-20 h-14 border-b border-rule-bold bg-paper/85 backdrop-blur-md flex items-center px-4 md:px-8">
+      <div className="md:pl-[260px] min-h-screen bg-paper-soft">
+        <header className="sticky top-0 z-20 h-14 border-b border-rule bg-paper/80 backdrop-blur-md flex items-center px-4 md:px-8">
           <button
             onClick={() => setMobileOpen(true)}
             aria-label="Open menu"
-            className="md:hidden mr-3 w-8 h-8 flex items-center justify-center text-ink-mute hover:text-ink hover:bg-paper-card"
+            className="md:hidden mr-3 w-8 h-8 flex items-center justify-center rounded-lg text-ink-mute hover:text-ink hover:bg-paper-deep"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -182,11 +187,11 @@ export function AppShell({ children, pageTitle, pageDescription, rightSlot, quot
           </button>
 
           <div className="flex-1 flex items-center gap-3 min-w-0">
-            <h1 className="font-display text-[18px] font-semibold tracking-tight truncate leading-none">{pageTitle}</h1>
+            <h1 className="text-[15px] font-semibold tracking-tight truncate leading-none">{pageTitle}</h1>
             {pageDescription && (
               <>
-                <span className="text-rule-strong">/</span>
-                <p className="text-[12px] text-ink-mute truncate hidden sm:block">{pageDescription}</p>
+                <span className="text-ink-faint">/</span>
+                <p className="text-[13px] text-ink-mute truncate hidden sm:block">{pageDescription}</p>
               </>
             )}
           </div>

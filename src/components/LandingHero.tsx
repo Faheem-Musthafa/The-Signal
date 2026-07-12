@@ -1,25 +1,38 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
-import { motion } from "motion/react";
-import { RevealWords, ScrollReveal, StaggerChildren, StaggerItem } from "./motion/Reveal";
+import { MotionConfig } from "motion/react";
+import { ALLOWED_TOPICS } from "@/lib/topics";
+import { ScrollReveal, StaggerChildren, StaggerItem } from "./motion/Reveal";
 import { MagneticButton } from "./motion/Magnetic";
 import { NumberTicker } from "./motion/NumberTicker";
-import { Marquee } from "./motion/Marquee";
-import { RotatingWord } from "./motion/RotatingWord";
+
+type LandingStory = {
+  headline: string;
+  category: string;
+  importance: number;
+  signal: string;
+  source: string;
+};
+
+type LandingStats = {
+  briefingsLast24h: number;
+  latest: {
+    topics: string[];
+    generatedAt: number;
+    stories: LandingStory[];
+  } | null;
+};
 
 /* ──────────────────────────────────────────────
-   THE SIGNAL — Editorial Wire Service
-   Newspaper broadsheet × terminal × magazine
+   THE SIGNAL — Clean modern SaaS landing
+   White surface × zinc hairlines × electric blue
    ────────────────────────────────────────────── */
-
-const TODAY = new Date();
-const ISO_DATE = TODAY.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
-const VOLUME = `Vol. I · No. ${String(Math.floor((TODAY.getTime() / 86400000) % 999)).padStart(3, "0")}`;
 
 function SignalGlyph({ size = 22 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" aria-hidden="true">
       <path d="M2 16c5 0 5-9 11-9s5 18 11 18 5-9 6-9" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx="16" cy="16" r="1.6" fill="currentColor" />
     </svg>
@@ -28,600 +41,488 @@ function SignalGlyph({ size = 22 }: { size?: number }) {
 
 function ArrowRight({ size = 16 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M5 12h14" />
       <path d="m12 5 7 7-7 7" />
     </svg>
   );
 }
 
-const TICKER_ITEMS = [
-  { tag: "AI", text: "Anthropic ships Opus 4.7 with native tool use" },
-  { tag: "FUNDING", text: "Vector DB startup raises $80M Series B" },
-  { tag: "BIG TECH", text: "Apple opens foundation models to developers" },
-  { tag: "DEVTOOLS", text: "Vercel introduces fluid compute pricing" },
-  { tag: "POLICY", text: "EU AI Act enforcement details published" },
-  { tag: "SCIENCE", text: "DeepMind cracks new class of protein folds" },
-];
+/* Shared interactive styles — visible focus ring on every control */
+const FOCUS = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal";
+const BTN_PRIMARY = `inline-flex items-center justify-center gap-2 rounded-lg bg-signal text-white font-semibold tracking-tight hover:bg-signal-deep transition-colors duration-200 ${FOCUS}`;
+const BTN_GHOST = `inline-flex items-center justify-center gap-2 rounded-lg border border-rule bg-paper text-ink font-medium hover:bg-paper-soft hover:border-rule-strong transition-colors duration-200 ${FOCUS}`;
 
-export function LandingHero() {
+/* ──────────── Briefing preview ────────────
+   Shows the latest real briefing when one exists;
+   falls back to sample stories before first fetch. */
+
+const SAMPLE: NonNullable<LandingStats["latest"]> = {
+  topics: ["AI & LLMs", "Startup Funding", "Big Tech"],
+  generatedAt: 0,
+  stories: [
+    { headline: "Anthropic ships Opus 4.7 with a native tool-use loop", category: "AI & LLMs", importance: 5, signal: "Tool calls now run in a single inference pass — cuts agent latency roughly 40%.", source: "techcrunch.com" },
+    { headline: "Vector DB startup raises $80M Series B led by Index", category: "Funding", importance: 4, signal: "", source: "" },
+    { headline: "Apple opens on-device foundation models to developers", category: "Big Tech", importance: 4, signal: "", source: "" },
+    { headline: "Vercel introduces fluid compute pricing for agents", category: "DevTools", importance: 3, signal: "", source: "" },
+  ],
+};
+
+function formatGeneratedAt(ms: number): string {
+  if (!ms) return "Today";
+  const d = new Date(ms);
+  const sameDay = new Date().toDateString() === d.toDateString();
+  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return sameDay ? `Today · ${time}` : d.toLocaleDateString([], { month: "short", day: "numeric" }) + ` · ${time}`;
+}
+
+function ScoreBars({ score, className = "" }: { score: number; className?: string }) {
   return (
-    <div className="min-h-screen w-full bg-paper text-ink relative overflow-x-hidden">
-      {/* ════════════ TOP WIRE TICKER ════════════ */}
-      <div className="bg-ink text-paper border-b border-rule-bold">
-        <Marquee className="py-2.5 text-[12px] font-mono" speed="normal">
-          {TICKER_ITEMS.concat(TICKER_ITEMS).map((item, i) => (
-            <span key={i} className="flex items-center gap-3">
-              <span className="text-signal font-semibold tracking-wider">[{item.tag}]</span>
-              <span className="text-paper">{item.text}</span>
-              <span className="text-ink-faint">·</span>
-            </span>
-          ))}
-        </Marquee>
+    <span className={`inline-flex items-end gap-[3px] ${className}`}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <span
+          key={i}
+          className={`w-[3px] rounded-full ${i <= score ? "bg-signal" : "bg-rule"}`}
+          style={{ height: 4 + i * 2 }}
+        />
+      ))}
+    </span>
+  );
+}
+
+function BriefingMock({ latest }: { latest: LandingStats["latest"] }) {
+  const data = latest && latest.stories.length > 0 ? latest : SAMPLE;
+  const [lead, ...rest] = data.stories;
+  const isReal = data.generatedAt > 0;
+
+  return (
+    /* Product preview — decorative for assistive tech; real content lives in the app */
+    <div aria-hidden="true" className="relative mx-auto max-w-2xl">
+      {/* Card */}
+      <div className="relative bg-paper border border-rule rounded-2xl shadow-[0_24px_64px_-24px_rgba(9,9,11,0.18)] overflow-hidden text-left">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-rule bg-paper-soft">
+          <span className="flex items-center gap-2">
+            <span className="live-dot" />
+            <span className="dateline text-ink">{isReal ? "Latest briefing" : "Live briefing"}</span>
+          </span>
+          <span className="hidden sm:flex items-center gap-1.5">
+            {data.topics.slice(0, 3).map((t) => (
+              <span key={t} className="rounded-full bg-paper-deep px-2.5 py-1 text-[10px] font-medium text-ink-2">
+                {t}
+              </span>
+            ))}
+          </span>
+          <span className="dateline">{formatGeneratedAt(data.generatedAt)}</span>
+        </div>
+
+        {/* Waveform motif strip */}
+        <svg viewBox="0 0 600 24" preserveAspectRatio="none" className="block w-full h-4 text-signal opacity-25">
+          <path
+            d="M0 12h60c20 0 20-8 40-8s20 16 40 16 20-8 40-8h60c20 0 20-6 40-6s20 12 40 12 20-6 40-6h60c20 0 20-9 40-9s20 18 40 18 20-9 40-9h60"
+            fill="none" stroke="currentColor" strokeWidth="1.5"
+          />
+        </svg>
+
+        {/* Lead story */}
+        <div className="px-5 pt-2 pb-5 sm:px-6">
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <span className="eyebrow text-[10px]">Lead story · {lead.category}</span>
+            <ScoreBars score={lead.importance} />
+          </div>
+          <p className="font-display text-[19px] sm:text-[22px] font-semibold leading-snug text-ink line-clamp-2">
+            {lead.headline}
+          </p>
+          {lead.source && <p className="dateline mt-1.5">{lead.source}</p>}
+
+          {lead.signal && (
+            <div className="mt-4 rounded-lg bg-signal-soft px-4 py-3">
+              <p className="text-[10px] font-mono uppercase tracking-[0.1em] text-signal font-semibold mb-1">
+                The Signal take
+              </p>
+              <p className="text-[13px] leading-snug text-ink-2 font-medium line-clamp-2">
+                {lead.signal}
+              </p>
+            </div>
+          )}
+
+          {/* Secondary stories */}
+          <ul className="mt-5 divide-y divide-rule border-t border-rule">
+            {rest.slice(0, 3).map((s) => (
+              <li key={s.headline} className="flex items-center gap-3 py-2.5 text-[12.5px]">
+                <ScoreBars score={s.importance} className="shrink-0" />
+                <span className="dateline w-[4.5rem] shrink-0 truncate">{s.category}</span>
+                <span className="text-ink-2 leading-snug truncate">{s.headline}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Card footer */}
+        <div className="flex items-center justify-between px-5 py-3 border-t border-rule bg-paper-soft">
+          <span className="dateline">{isReal ? `Generated ${formatGeneratedAt(data.generatedAt)}` : "Sample briefing"}</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-signal text-white px-3 py-1 text-[11px] font-semibold">
+            Share brief
+            <ArrowRight size={11} />
+          </span>
+        </div>
       </div>
 
-      {/* ════════════ MASTHEAD NAV ════════════ */}
-      <header className="sticky top-0 z-40 bg-paper/85 backdrop-blur-md border-b border-rule">
-        <div className="max-w-[1280px] mx-auto px-6">
-          <div className="h-16 flex items-center justify-between">
-            <div className="flex items-center gap-10">
-              <a href="/" className="flex items-center gap-2.5 group">
-                <span className="text-signal transition-transform group-hover:rotate-12 group-hover:scale-110 duration-300">
-                  <SignalGlyph size={22} />
-                </span>
-                <span className="font-display text-[22px] font-semibold tracking-tight leading-none">
-                  The Signal
-                </span>
+      {/* Floating digest chip */}
+      <div className="hidden md:flex absolute -right-10 top-10 items-center gap-2.5 elev-1 px-4 py-2.5 shadow-md">
+        <span className="text-signal"><SignalGlyph size={16} /></span>
+        <span className="text-[12px] font-medium text-ink">Daily digest</span>
+        <span className="dateline">straight to your inbox</span>
+      </div>
+    </div>
+  );
+}
+
+/* ──────────── Feature icons ──────────── */
+
+function IconChip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-signal-soft text-signal" aria-hidden="true">
+      {children}
+    </span>
+  );
+}
+
+/* Bespoke duotone icon set — every glyph carries the waveform motif */
+const icon = { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", "aria-hidden": true } as const;
+const stroke = { stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+
+const FEATURES = [
+  {
+    title: "Generate on demand",
+    body: "Pick your topics and hit generate. A synthesized briefing lands in 15–30 seconds — no feed, no scrolling.",
+    svg: (
+      <svg {...icon}>
+        <path d="M13 2 4.5 13H11l-1.5 9L18 11h-6.5L13 2z" fill="currentColor" fillOpacity="0.18" />
+        <path {...stroke} d="M13 2 4.5 13H11l-1.5 9L18 11h-6.5L13 2z" />
+        <path {...stroke} strokeWidth="1.4" d="M17 19c1.4 0 1.4-2 2.8-2s1.4 2 2.8 2" opacity="0.8" />
+      </svg>
+    ),
+  },
+  {
+    title: "Ranked, not random",
+    body: "Every story is scored 1–5 on importance, so the lead story actually leads and the noise stays out.",
+    svg: (
+      <svg {...icon}>
+        <rect x="3" y="15" width="3" height="6" rx="1.5" fill="currentColor" fillOpacity="0.25" />
+        <rect x="8.5" y="11" width="3" height="10" rx="1.5" fill="currentColor" fillOpacity="0.45" />
+        <rect x="14" y="7" width="3" height="14" rx="1.5" fill="currentColor" fillOpacity="0.7" />
+        <rect x="19.5" y="3" width="3" height="18" rx="1.5" fill="currentColor" />
+        <circle cx="21" cy="1.8" r="1.4" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
+    title: "Daily email digest",
+    body: "Schedule delivery to your inbox at any hour, in your timezone. Skip days when you're busy.",
+    svg: (
+      <svg {...icon}>
+        <rect x="2.5" y="4.5" width="19" height="15" rx="3" fill="currentColor" fillOpacity="0.14" />
+        <rect {...stroke} x="2.5" y="4.5" width="19" height="15" rx="3" />
+        <path {...stroke} d="M5.5 9c1.6 0 1.6 2.4 3.2 2.4S10.3 9 12 9s1.6 2.4 3.2 2.4S16.8 9 18.5 9" />
+        <circle cx="18" cy="16" r="1.3" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
+    title: "Shareable permalinks",
+    body: "Each briefing gets a permanent link. Paste it in Slack, Notion, or anywhere your team lives.",
+    svg: (
+      <svg {...icon}>
+        <circle cx="5.5" cy="12" r="3.2" fill="currentColor" fillOpacity="0.18" />
+        <circle {...stroke} cx="5.5" cy="12" r="3.2" />
+        <circle cx="18.5" cy="12" r="3.2" fill="currentColor" fillOpacity="0.18" />
+        <circle {...stroke} cx="18.5" cy="12" r="3.2" />
+        <path {...stroke} d="M8.7 12c1.6 0 1.6-2.2 3.3-2.2s1.7 4.4 3.3 4.4" />
+      </svg>
+    ),
+  },
+  {
+    title: "Eight curated topics",
+    body: "AI, startup funding, big tech, developer tools, crypto, policy, hardware, and hiring — refined by what operators actually read.",
+    svg: (
+      <svg {...icon}>
+        {/* 8 dots = 8 topics; solid ones read as "selected" */}
+        {[
+          { cx: 5, cy: 6, o: 1 }, { cx: 11, cy: 6, o: 0.35 }, { cx: 17, cy: 6, o: 1 },
+          { cx: 5, cy: 12, o: 0.35 }, { cx: 11, cy: 12, o: 1 }, { cx: 17, cy: 12, o: 0.35 },
+          { cx: 5, cy: 18, o: 0.35 }, { cx: 11, cy: 18, o: 1 },
+        ].map((d, i) => (
+          <circle key={i} cx={d.cx} cy={d.cy} r="2.1" fill="currentColor" fillOpacity={d.o} />
+        ))}
+        <path {...stroke} strokeWidth="1.4" d="M15.5 15.5c1.8 0 1.8 2.5 3.6 2.5s1.8-2.5 3.4-2.5" opacity="0.8" />
+      </svg>
+    ),
+  },
+  {
+    title: "Private by default",
+    body: "We don't train on your topic preferences or reading history. Export anytime, leave in one click.",
+    svg: (
+      <svg {...icon}>
+        <path d="M12 2.5 4.5 5.3v5.9c0 4.6 3.2 7.9 7.5 10.3 4.3-2.4 7.5-5.7 7.5-10.3V5.3L12 2.5z" fill="currentColor" fillOpacity="0.14" />
+        <path {...stroke} d="M12 2.5 4.5 5.3v5.9c0 4.6 3.2 7.9 7.5 10.3 4.3-2.4 7.5-5.7 7.5-10.3V5.3L12 2.5z" />
+        <path {...stroke} d="M8 12c1.3 0 1.3-2 2.7-2s1.3 4 2.7 4 1.3-2 2.6-2" />
+      </svg>
+    ),
+  },
+];
+
+/* Step markers: waveform progress fills as the sequence advances */
+const STEPS = [
+  { n: "01", progress: 1 / 3, t: "Pick your topics", b: "Choose up to 8 from a curated set: AI, startup funding, big tech, developer tools, crypto, policy, hardware, hiring." },
+  { n: "02", progress: 2 / 3, t: "Generate or schedule", b: "Hit generate for an instant brief, or set a daily delivery hour for your inbox digest." },
+  { n: "03", progress: 1, t: "Read in two minutes", b: "Each story comes with a one-line take, importance score, and source. No filler. No ads." },
+];
+
+function StepWave({ progress }: { progress: number }) {
+  const total = 72;
+  const filled = Math.round(total * progress);
+  return (
+    <svg width={total} height="14" viewBox={`0 0 ${total} 14`} fill="none" aria-hidden="true" className="mt-3">
+      <path d="M0 7c6 0 6-5 12-5s6 10 12 10 6-5 12-5 6-3 12-3 6 6 12 6 6-3 12-3" stroke="var(--rule-strong)" strokeWidth="1.6" strokeLinecap="round" />
+      <path
+        d="M0 7c6 0 6-5 12-5s6 10 12 10 6-5 12-5 6-3 12-3 6 6 12 6 6-3 12-3"
+        stroke="var(--signal)" strokeWidth="1.6" strokeLinecap="round"
+        strokeDasharray={`${filled} ${total}`}
+        pathLength={total}
+      />
+    </svg>
+  );
+}
+
+/* ──────────── Page ──────────── */
+
+export function LandingHero() {
+  const [stats, setStats] = useState<LandingStats | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/stats")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setStats(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <MotionConfig reducedMotion="user">
+      <div className="min-h-screen w-full bg-paper text-ink relative overflow-x-hidden">
+        {/* ── Sticky nav ── */}
+        <header className="sticky top-0 z-40 bg-paper/80 backdrop-blur-md border-b border-rule">
+          <div className="max-w-6xl mx-auto px-5 sm:px-6 h-16 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-9">
+              <a href="/" className={`flex items-center gap-2.5 rounded-md ${FOCUS}`}>
+                <span className="text-signal"><SignalGlyph size={22} /></span>
+                <span className="font-display text-[19px] font-semibold tracking-tight leading-none">The Signal</span>
               </a>
-              <nav className="hidden md:flex items-center gap-7 text-[13px] font-medium text-ink-2">
-                <a href="#product" className="ink-link">Product</a>
-                <a href="#coverage" className="ink-link">Coverage</a>
-                <a href="#workflow" className="ink-link">How it works</a>
-                <a href="#pricing" className="ink-link">Pricing</a>
+              <nav aria-label="Main" className="hidden md:flex items-center gap-7 text-[13.5px] font-medium text-ink-2">
+                <a href="#features" className={`ink-link rounded-sm py-2 ${FOCUS}`}>Features</a>
+                <a href="#how-it-works" className={`ink-link rounded-sm py-2 ${FOCUS}`}>How it works</a>
               </nav>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
               <SignInButton mode="modal">
-                <button className="hidden sm:inline-block px-3 py-1.5 text-[13px] font-medium text-ink-mute hover:text-ink transition-colors">
+                <button className={`hidden sm:inline-flex px-3.5 py-2 rounded-lg text-[13.5px] font-medium text-ink-2 hover:text-ink hover:bg-paper-soft transition-colors ${FOCUS}`}>
                   Sign in
                 </button>
               </SignInButton>
               <SignUpButton mode="modal">
-                <button className="px-4 py-2 bg-ink text-paper text-[13px] font-semibold tracking-tight hover:bg-signal transition-colors duration-300">
-                  Subscribe →
-                </button>
+                <button className={`${BTN_PRIMARY} px-4 py-2 text-[13.5px]`}>Get started</button>
               </SignUpButton>
             </div>
           </div>
-          {/* Dateline strip */}
-          <div className="hidden md:flex items-center justify-between border-t border-rule py-1.5 text-[10px] font-mono uppercase tracking-[0.18em] text-ink-mute">
-            <span>{VOLUME}</span>
-            <span className="flex items-center gap-2">
-              <span className="live-dot" /> Live · {ISO_DATE}
-            </span>
-            <span>Curated by AI · Refined for humans</span>
-          </div>
-        </div>
-      </header>
+        </header>
 
-      {/* ════════════ HERO ════════════ */}
-      <section className="relative border-b border-rule-bold">
-        <div className="absolute inset-0 bg-grid bg-grid-fade pointer-events-none opacity-50" />
-        <div className="relative max-w-[1280px] mx-auto px-6 pt-16 md:pt-24 pb-20 md:pb-28">
-          {/* Editorial section header */}
-          <div className="grid grid-cols-12 gap-x-6 mb-10">
-            <div className="col-span-12 flex items-center justify-between rule-fold">
-              <span className="dateline">Edition · Real-time tech intelligence</span>
-              <span className="dateline">No. 001 / Featured</span>
-            </div>
-          </div>
+        {/* ── Hero ── */}
+        <section className="relative border-b border-rule">
+          <div className="absolute inset-0 bg-grid bg-grid-fade pointer-events-none" aria-hidden="true" />
+          <div className="relative max-w-6xl mx-auto px-5 sm:px-6 pt-16 md:pt-24 pb-16 md:pb-24 text-center">
+            <ScrollReveal>
+              <span className="inline-flex items-center gap-2 rounded-full border border-rule bg-paper px-3.5 py-1.5 text-[12px] font-medium text-ink-2 shadow-sm">
+                <span className="live-dot" />
+                Live · AI-curated every day
+              </span>
 
-          <div className="grid grid-cols-12 gap-x-6 gap-y-8 items-end">
-            {/* Hero copy — 7 columns */}
-            <div className="col-span-12 lg:col-span-8">
-              <RevealWords
-                as="h1"
-                text="Tech news, distilled to the signal."
-                className="font-display text-[58px] md:text-[88px] lg:text-[108px] leading-[0.94] font-semibold tracking-[-0.035em]"
-                stagger={0.07}
-              />
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.9, duration: 0.6 }}
-                className="mt-3 font-display-italic text-[28px] md:text-[40px] lg:text-[52px] leading-[1.05] text-signal"
-              >
-                Read in two minutes.
-              </motion.div>
+              <h1 className="mt-6 font-display font-semibold tracking-[-0.035em] text-[42px] sm:text-[60px] md:text-[76px] leading-[1.02] max-w-4xl mx-auto text-balance">
+                Tech news, distilled to <span className="text-signal">the signal</span>.
+              </h1>
 
-              <motion.p
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.1, duration: 0.7 }}
-                className="mt-8 max-w-xl font-sans text-[16px] md:text-[18px] text-ink-2 leading-[1.55]"
-              >
-                The Signal scans <strong className="font-semibold">1,247 sources</strong> every minute and synthesizes a real-time briefing on the topics that move your world. No firehose. No filler. No ads.
-              </motion.p>
+              <p className="mt-5 max-w-xl mx-auto text-[16px] md:text-[18px] text-ink-2 leading-[1.55]">
+                The Signal scans the live web, scores every story on importance, and hands you a two-minute briefing on the topics you pick. No feed. No filler. No ads.
+              </p>
 
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.3, duration: 0.7 }}
-                className="mt-8 flex flex-wrap items-center gap-3"
-              >
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
                 <SignUpButton mode="modal">
-                  <MagneticButton className="inline-flex items-center gap-2 px-6 py-3.5 bg-ink text-paper text-[14px] font-semibold tracking-tight hover:bg-signal transition-colors duration-300">
-                    Start reading the signal
+                  <MagneticButton className={`${BTN_PRIMARY} px-6 py-3 text-[14.5px] shadow-sm`}>
+                    Get started free
                     <ArrowRight />
                   </MagneticButton>
                 </SignUpButton>
-                <a href="#product" className="inline-flex items-center gap-2 px-5 py-3.5 border border-rule-bold text-[14px] font-medium hover:bg-paper-card transition-colors">
-                  See a sample briefing
+                <a href="#how-it-works" className={`${BTN_GHOST} px-5 py-3 text-[14.5px]`}>
+                  See how it works
                 </a>
-              </motion.div>
+              </div>
 
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1.5, duration: 0.6 }}
-                className="mt-6 dateline"
-              >
-                Free forever · 3 briefings/day · No card required
-              </motion.p>
-            </div>
+              <p className="mt-5 dateline">Free forever · 3 briefings a day · No card required</p>
+            </ScrollReveal>
 
-            {/* Hero side — front-page mock */}
-            <div className="col-span-12 lg:col-span-4">
-              <motion.div
-                initial={{ opacity: 0, y: 24, rotate: -1 }}
-                animate={{ opacity: 1, y: 0, rotate: -1 }}
-                transition={{ delay: 1.0, duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-                className="bg-paper-card border border-rule-bold p-6 shadow-[12px_12px_0_-2px_rgba(214,50,27,0.18)]"
-              >
-                <div className="flex items-center justify-between pb-3 mb-4 border-b-2 border-ink">
-                  <div className="flex items-center gap-2">
-                    <span className="live-dot" />
-                    <span className="dateline">Live wire</span>
-                  </div>
-                  <span className="dateline">{TODAY.toUTCString().slice(17, 22)} UTC</span>
-                </div>
-
-                <div className="text-[10px] font-mono uppercase tracking-[0.16em] text-signal mb-2">Lead story</div>
-                <h3 className="font-display text-[26px] leading-[1.05] font-semibold mb-3">
-                  Anthropic ships Opus 4.7 with native tool-use loop
-                </h3>
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="dateline">techcrunch.com</span>
-                  <div className="flex gap-0.5">
-                    {[1, 1, 1, 1, 1].map((_, i) => (
-                      <div key={i} className="w-1 h-3 bg-signal" />
-                    ))}
-                  </div>
-                </div>
-
-                <div className="border-l-2 border-signal pl-3 py-1 mb-5">
-                  <p className="dateline mb-1 text-signal">The Signal</p>
-                  <p className="text-[13px] text-ink-2 leading-snug font-medium">
-                    Tool calls now run in a single inference pass — cuts agent latency 40%.
-                  </p>
-                </div>
-
-                <div className="space-y-3 pt-4 border-t border-rule">
-                  {TICKER_ITEMS.slice(1, 4).map((item, i) => (
-                    <div key={i} className="flex items-start gap-2 text-[12px]">
-                      <span className="dateline w-16 shrink-0 pt-0.5">{item.tag}</span>
-                      <span className="text-ink-2 leading-snug">{item.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            </div>
+            <ScrollReveal delay={0.15} className="mt-14 md:mt-16">
+              <BriefingMock latest={stats?.latest ?? null} />
+            </ScrollReveal>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ════════════ STATS STRIP ════════════ */}
-      <section className="border-b border-rule-bold bg-paper-soft">
-        <div className="max-w-[1280px] mx-auto px-6 py-12 md:py-16">
-          <StaggerChildren className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            <StaggerItem className="border-l-2 border-ink pl-4">
-              <div className="font-display text-5xl md:text-6xl font-semibold tracking-tight tabular-nums">
-                <NumberTicker value={1247} />
-              </div>
-              <div className="dateline mt-2">Sources scanned · per minute</div>
-            </StaggerItem>
-            <StaggerItem className="border-l-2 border-ink pl-4">
-              <div className="font-display text-5xl md:text-6xl font-semibold tracking-tight tabular-nums">
-                <NumberTicker value={30} />
-                <span className="text-ink-mute text-3xl">s</span>
-              </div>
-              <div className="dateline mt-2">Average synthesis time</div>
-            </StaggerItem>
-            <StaggerItem className="border-l-2 border-ink pl-4">
-              <div className="font-display text-5xl md:text-6xl font-semibold tracking-tight tabular-nums">
-                <NumberTicker value={8} />
-              </div>
-              <div className="dateline mt-2">Curated topics · more soon</div>
-            </StaggerItem>
-            <StaggerItem className="border-l-2 border-signal pl-4">
-              <div className="font-display text-5xl md:text-6xl font-semibold tracking-tight tabular-nums text-signal">
-                <NumberTicker value={0} format={(n) => `$${Math.round(n)}`} />
-              </div>
-              <div className="dateline mt-2">Free forever · 3 daily briefings</div>
-            </StaggerItem>
-          </StaggerChildren>
-        </div>
-      </section>
+        {/* ── Trust / meta strip ── */}
+        <section className="border-b border-rule bg-paper-soft" aria-label="Product stats">
+          <div className="max-w-6xl mx-auto px-5 sm:px-6 py-10 md:py-12">
+            <StaggerChildren className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-8">
+              {[
+                { value: <NumberTicker value={stats?.briefingsLast24h ?? 0} />, label: "Briefings generated in the last 24 hours" },
+                { value: <NumberTicker value={ALLOWED_TOPICS.length} />, label: "Curated topics to choose from" },
+                { value: <NumberTicker value={3} />, label: "Free briefings every day" },
+                { value: <><NumberTicker value={30} /><span className="text-ink-mute text-2xl">s</span></>, label: "Typical time to synthesize" },
+              ].map((stat, i) => (
+                <StaggerItem key={i}>
+                  <div className="font-display text-4xl md:text-5xl font-semibold tracking-tight tabular-nums text-ink">
+                    {stat.value}
+                  </div>
+                  <div className="mt-1.5 text-[13px] text-ink-mute">{stat.label}</div>
+                </StaggerItem>
+              ))}
+            </StaggerChildren>
+          </div>
+        </section>
 
-      {/* ════════════ PRODUCT — ASYMMETRIC FEATURE GRID ════════════ */}
-      <section id="product" className="border-b border-rule-bold">
-        <div className="max-w-[1280px] mx-auto px-6 py-20 md:py-28">
-          <ScrollReveal>
-            <div className="grid grid-cols-12 gap-x-6 mb-12">
-              <div className="col-span-12 md:col-span-4">
-                <div className="eyebrow mb-4">The product</div>
-                <h2 className="font-display text-4xl md:text-6xl font-semibold tracking-tight leading-[0.98]">
-                  One briefing.<br />
-                  <em className="font-display-italic text-signal">Every signal that matters.</em>
-                </h2>
-              </div>
-              <div className="col-span-12 md:col-span-7 md:col-start-6 md:pt-3">
-                <p className="font-display-italic text-2xl md:text-3xl text-ink-2 leading-[1.25] max-w-2xl drop-cap">
-                  Pick your topics. Hit generate. We crawl thousands of sources, score every story 1–5 on importance, and hand you a brief you can finish before your coffee cools.
-                </p>
-              </div>
-            </div>
-          </ScrollReveal>
-
-          {/* Asymmetric bento — newspaper page layout */}
-          <div className="grid grid-cols-12 gap-px bg-rule-bold border border-rule-bold">
-            {/* Big lead card */}
-            <ScrollReveal className="col-span-12 lg:col-span-7 bg-paper-card p-8 md:p-10 min-h-[420px] flex flex-col" delay={0.1}>
-              <div className="flex items-center justify-between mb-6">
-                <span className="eyebrow">Real-time briefing</span>
-                <span className="dateline">~30s</span>
-              </div>
-              <h3 className="font-display text-3xl md:text-4xl font-semibold tracking-tight mb-3">
-                Generate on demand.
-              </h3>
-              <p className="text-[15px] text-ink-2 leading-relaxed mb-8 max-w-md">
-                Tell us which topics matter. We synthesize a curated briefing in 15–30 seconds. No scrolling, no doomscrolling.
+        {/* ── Features ── */}
+        <section id="features" className="scroll-mt-20 border-b border-rule">
+          <div className="max-w-6xl mx-auto px-5 sm:px-6 py-16 md:py-24">
+            <ScrollReveal className="max-w-2xl mb-12">
+              <p className="eyebrow mb-3">The product</p>
+              <h2 className="font-display text-3xl md:text-[42px] font-semibold tracking-tight leading-[1.05]">
+                One briefing. Every signal that matters.
+              </h2>
+              <p className="mt-4 text-[15.5px] text-ink-2 leading-relaxed">
+                Pick your topics, hit generate, and get a brief you can finish before your coffee cools.
               </p>
-              <div className="mt-auto bg-paper border-2 border-ink p-5 space-y-3">
-                {[
-                  { t: "AI & LLMs", on: true },
-                  { t: "Startup Funding", on: true },
-                  { t: "Big Tech", on: true },
-                  { t: "DevTools", on: false },
-                ].map(({ t, on }) => (
-                  <div key={t} className="flex items-center justify-between text-[13px]">
-                    <span className={`flex items-center gap-3 ${on ? "text-ink" : "text-ink-dim"}`}>
-                      <span className={`w-4 h-4 border-2 ${on ? "bg-ink border-ink" : "border-rule-strong"}`}>
-                        {on && (
-                          <svg viewBox="0 0 12 12" className="w-full h-full text-signal" fill="none" stroke="currentColor" strokeWidth="2.5">
-                            <path d="m2.5 6 2.5 2.5 4.5-5" />
-                          </svg>
-                        )}
+            </ScrollReveal>
+
+            <StaggerChildren className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4" stagger={0.06}>
+              {FEATURES.map((f) => (
+                <StaggerItem key={f.title}>
+                  <div className="elev-1 h-full p-6 transition-shadow duration-200 hover:shadow-md">
+                    <IconChip>{f.svg}</IconChip>
+                    <h3 className="mt-4 font-display text-[17px] font-semibold tracking-tight">{f.title}</h3>
+                    <p className="mt-1.5 text-[14px] text-ink-2 leading-relaxed">{f.body}</p>
+                  </div>
+                </StaggerItem>
+              ))}
+            </StaggerChildren>
+          </div>
+        </section>
+
+        {/* ── How it works ── */}
+        <section id="how-it-works" className="scroll-mt-20 border-b border-rule bg-paper-soft">
+          <div className="max-w-6xl mx-auto px-5 sm:px-6 py-16 md:py-24">
+            <ScrollReveal className="max-w-2xl mb-12">
+              <p className="eyebrow mb-3">How it works</p>
+              <h2 className="font-display text-3xl md:text-[42px] font-semibold tracking-tight leading-[1.05]">
+                Three steps. Sixty seconds.
+              </h2>
+            </ScrollReveal>
+
+            <StaggerChildren className="grid md:grid-cols-3 gap-4" stagger={0.08}>
+              {STEPS.map((step) => (
+                <StaggerItem key={step.n}>
+                  <div className="elev-1 h-full p-6">
+                    <div className="flex items-center justify-between">
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-signal-soft text-signal font-mono text-[13px] font-semibold">
+                        {step.n}
                       </span>
-                      {t}
-                    </span>
-                    <span className="dateline">{on ? "selected" : ""}</span>
+                      <StepWave progress={step.progress} />
+                    </div>
+                    <h3 className="mt-4 font-display text-[17px] font-semibold tracking-tight">{step.t}</h3>
+                    <p className="mt-1.5 text-[14px] text-ink-2 leading-relaxed">{step.b}</p>
                   </div>
-                ))}
-                <div className="pt-3 mt-2 border-t border-rule flex items-center justify-between">
-                  <span className="dateline">3 of 8 topics</span>
-                  <span className="text-[11px] font-mono font-semibold bg-signal text-paper px-2.5 py-1">
-                    GENERATE →
-                  </span>
-                </div>
-              </div>
-            </ScrollReveal>
-
-            {/* Right column stack */}
-            <ScrollReveal className="col-span-12 lg:col-span-5 bg-paper-card p-8 md:p-10 min-h-[210px] flex flex-col" delay={0.2}>
-              <span className="eyebrow mb-4">Newsletter</span>
-              <h3 className="font-display text-2xl md:text-3xl font-semibold tracking-tight mb-3">
-                Daily digest.
-              </h3>
-              <p className="text-[14px] text-ink-2 leading-relaxed mb-4">
-                Schedule delivery to your inbox at any hour, in your timezone. Skip days when you&apos;re busy.
-              </p>
-              <div className="mt-auto bg-paper border border-rule p-3 flex items-center gap-3 text-[12px]">
-                <span className="font-mono text-signal">07:00</span>
-                <span className="text-ink-mute">·</span>
-                <span className="font-mono text-ink-mute">{Intl.DateTimeFormat().resolvedOptions().timeZone}</span>
-                <span className="ml-auto dateline">Active</span>
-              </div>
-            </ScrollReveal>
-
-            <ScrollReveal className="col-span-12 lg:col-span-5 bg-paper-card p-8 md:p-10 min-h-[210px] flex flex-col" delay={0.3}>
-              <span className="eyebrow mb-4">Signal score</span>
-              <h3 className="font-display text-2xl md:text-3xl font-semibold tracking-tight mb-3">
-                Ranked, not random.
-              </h3>
-              <p className="text-[14px] text-ink-2 leading-relaxed mb-4">Every story scored 1–5 on importance. The lead story leads.</p>
-              <div className="mt-auto flex items-end gap-1">
-                {[5, 4, 5, 3, 2, 4, 5, 4, 3, 5, 4, 2, 5, 3, 4, 5].map((v, i) => (
-                  <div key={i} className="flex flex-col-reverse gap-0.5" style={{ height: 36 }}>
-                    {Array.from({ length: 5 }).map((_, j) => (
-                      <div key={j} className={`w-2.5 h-1.5 ${j < v ? "bg-ink" : "bg-rule"}`} />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </ScrollReveal>
-
-            {/* Bottom wide */}
-            <ScrollReveal className="col-span-12 lg:col-span-6 bg-paper-card p-8 md:p-10 min-h-[200px] flex flex-col" delay={0.4}>
-              <span className="eyebrow mb-4">Share</span>
-              <h3 className="font-display text-2xl md:text-3xl font-semibold tracking-tight mb-3">
-                Send anyone the brief.
-              </h3>
-              <p className="text-[14px] text-ink-2 leading-relaxed mb-4">
-                Each briefing gets a permanent link. Paste in Slack, Notion, or anywhere your team lives.
-              </p>
-              <div className="mt-auto bg-ink text-paper px-4 py-3 flex items-center gap-2 text-[12px] font-mono">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7L11 5" /><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1" /></svg>
-                thesignal.app/share/k7m2xq
-                <span className="ml-auto text-signal animate-blink">●</span>
-              </div>
-            </ScrollReveal>
-
-            <ScrollReveal className="col-span-12 lg:col-span-6 bg-paper-card p-8 md:p-10 min-h-[200px] flex flex-col" delay={0.5}>
-              <span className="eyebrow mb-4">Privacy</span>
-              <h3 className="font-display text-2xl md:text-3xl font-semibold tracking-tight mb-3">
-                Your interests stay yours.
-              </h3>
-              <p className="text-[14px] text-ink-2 leading-relaxed">
-                We don&apos;t train models on your topic preferences or reading history. Unsubscribe in one click. Export anytime.
-              </p>
-            </ScrollReveal>
+                </StaggerItem>
+              ))}
+            </StaggerChildren>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ════════════ EDITORIAL PULL QUOTE ════════════ */}
-      <section className="border-b border-rule-bold bg-ink text-paper">
-        <div className="max-w-[1280px] mx-auto px-6 py-24 md:py-32 grid grid-cols-12 gap-x-6">
-          <div className="col-span-12 md:col-span-2 mb-6 md:mb-0">
-            <div className="text-signal text-[100px] md:text-[180px] font-display leading-[0.7] -mt-4">&ldquo;</div>
-          </div>
-          <div className="col-span-12 md:col-span-10">
+        {/* ── Final CTA band ── */}
+        <section className="border-b border-rule">
+          <div className="max-w-6xl mx-auto px-5 sm:px-6 py-16 md:py-24">
             <ScrollReveal>
-              <p className="font-display text-3xl md:text-5xl lg:text-6xl leading-[1.08] tracking-tight font-medium">
-                The internet writes <em className="font-display-italic text-signal">a million words an hour</em>. You have time for two minutes. The Signal does the math.
-              </p>
-              <div className="mt-8 flex items-center gap-4">
-                <div className="h-px w-16 bg-signal" />
-                <span className="dateline text-paper">Editor&apos;s note · Vol. I</span>
-              </div>
-            </ScrollReveal>
-          </div>
-        </div>
-      </section>
-
-      {/* ════════════ HOW IT WORKS ════════════ */}
-      <section id="workflow" className="border-b border-rule-bold">
-        <div className="max-w-[1280px] mx-auto px-6 py-20 md:py-28">
-          <ScrollReveal className="mb-14">
-            <div className="eyebrow mb-4">Workflow</div>
-            <h2 className="font-display text-4xl md:text-6xl font-semibold tracking-tight leading-[0.98] max-w-3xl">
-              Three steps. Sixty seconds.<br />
-              <em className="font-display-italic text-signal">From sign-up to your first brief.</em>
-            </h2>
-          </ScrollReveal>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-rule-bold border border-rule-bold">
-            {[
-              { n: "01", t: "Pick your topics", b: "Choose up to 8 from a curated set: AI, funding, big tech, devtools, policy, science, crypto, security." },
-              { n: "02", t: "Generate or schedule", b: "Hit generate for an instant brief, or set a daily delivery hour for your inbox digest." },
-              { n: "03", t: "Read in two minutes", b: "Each story comes with a one-line take, importance score, and source. No filler. No ads." },
-            ].map((step, i) => (
-              <ScrollReveal key={step.n} className="bg-paper-card p-8 md:p-10 min-h-[280px] flex flex-col" delay={i * 0.1}>
-                <div className="flex items-baseline justify-between mb-6">
-                  <div className="font-display text-7xl md:text-8xl text-signal font-semibold leading-none tracking-tighter">
-                    {step.n}
+              <div className="relative overflow-hidden rounded-2xl bg-ink text-paper px-6 py-14 md:px-16 md:py-20 text-center">
+                {/* Waveform motif */}
+                <svg viewBox="0 0 600 80" preserveAspectRatio="none" className="absolute inset-x-0 bottom-0 w-full h-16 text-signal opacity-30" aria-hidden="true">
+                  <path
+                    d="M0 40h60c20 0 20-24 40-24s20 48 40 48 20-24 40-24h60c20 0 20-18 40-18s20 36 40 36 20-18 40-18h60c20 0 20-28 40-28s20 56 40 56 20-28 40-28h60"
+                    fill="none" stroke="currentColor" strokeWidth="1.5"
+                  />
+                </svg>
+                <div className="relative">
+                  <h2 className="font-display text-3xl md:text-5xl font-semibold tracking-tight leading-[1.05] max-w-2xl mx-auto text-balance text-paper">
+                    Stop scrolling. Start reading the signal.
+                  </h2>
+                  <p className="mt-4 text-[15px] md:text-[16px] text-ink-faint max-w-lg mx-auto leading-relaxed">
+                    Sign up in 10 seconds, read your first briefing in 30. Free forever for 3 briefings a day.
+                  </p>
+                  <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+                    <SignUpButton mode="modal">
+                      <MagneticButton className={`${BTN_PRIMARY} px-6 py-3 text-[14.5px]`}>
+                        Get started free
+                        <ArrowRight />
+                      </MagneticButton>
+                    </SignUpButton>
+                    <SignInButton mode="modal">
+                      <button className={`inline-flex items-center justify-center rounded-lg border border-white/25 px-5 py-3 text-[14.5px] font-medium text-paper hover:bg-white/10 transition-colors ${FOCUS}`}>
+                        Sign in
+                      </button>
+                    </SignInButton>
                   </div>
-                  <div className="dateline">Step</div>
                 </div>
-                <h3 className="font-display text-2xl md:text-3xl font-semibold tracking-tight mb-3">{step.t}</h3>
-                <p className="text-[14px] text-ink-2 leading-relaxed">{step.b}</p>
-              </ScrollReveal>
-            ))}
+              </div>
+            </ScrollReveal>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ════════════ COVERAGE — TOPIC GRID ════════════ */}
-      <section id="coverage" className="border-b border-rule-bold bg-paper-soft">
-        <div className="max-w-[1280px] mx-auto px-6 py-20 md:py-28">
-          <ScrollReveal className="mb-14">
-            <div className="grid grid-cols-12 gap-x-6">
-              <div className="col-span-12 md:col-span-5">
-                <div className="eyebrow mb-4">Coverage</div>
-                <h2 className="font-display text-4xl md:text-6xl font-semibold tracking-tight leading-[0.98]">
-                  Topics worth your <em className="font-display-italic text-signal">attention</em>.
-                </h2>
-              </div>
-              <div className="col-span-12 md:col-span-6 md:col-start-7 md:pt-3">
-                <p className="font-sans text-[16px] md:text-[18px] text-ink-2 leading-[1.55] max-w-xl">
-                  A focused set of categories — refined by what tech operators, founders, and investors actually want to read. More coming on the wire.
-                </p>
-              </div>
+        {/* ── Footer ── */}
+        <footer className="bg-paper">
+          <div className="max-w-6xl mx-auto px-5 sm:px-6 py-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-center gap-2.5">
+              <span className="text-signal"><SignalGlyph size={20} /></span>
+              <span className="font-display text-[17px] font-semibold tracking-tight">The Signal</span>
+              <span className="hidden sm:inline text-[13px] text-ink-mute">— tech intelligence, distilled.</span>
             </div>
-          </ScrollReveal>
-
-          <StaggerChildren className="grid grid-cols-2 md:grid-cols-4 gap-px bg-rule-bold border border-rule-bold" stagger={0.05}>
-            {[
-              { t: "AI & LLMs", n: 312 },
-              { t: "Startup Funding", n: 187 },
-              { t: "Big Tech", n: 234 },
-              { t: "DevTools", n: 156 },
-              { t: "Cybersecurity", n: 142 },
-              { t: "Crypto & Web3", n: 98 },
-              { t: "Science", n: 121 },
-              { t: "Policy", n: 76 },
-            ].map((topic) => (
-              <StaggerItem key={topic.t} className="bg-paper-card p-7 hover:bg-paper transition-colors duration-300 group cursor-default">
-                <div className="font-display text-[22px] font-semibold tracking-tight mb-2 group-hover:text-signal transition-colors">
-                  {topic.t}
-                </div>
-                <div className="dateline flex items-center justify-between">
-                  <span>{topic.n} stories / week</span>
-                  <span className="opacity-0 group-hover:opacity-100 transition-opacity text-signal">→</span>
-                </div>
-              </StaggerItem>
-            ))}
-          </StaggerChildren>
-        </div>
-      </section>
-
-      {/* ════════════ PRICING ════════════ */}
-      <section id="pricing" className="border-b border-rule-bold">
-        <div className="max-w-[1280px] mx-auto px-6 py-20 md:py-28">
-          <ScrollReveal className="mb-14 text-center">
-            <div className="eyebrow justify-center mb-4">Subscription</div>
-            <h2 className="font-display text-4xl md:text-6xl font-semibold tracking-tight leading-[0.98]">
-              Free to read. <em className="font-display-italic text-signal">Forever.</em>
-            </h2>
-            <p className="font-sans text-[16px] text-ink-2 mt-4 max-w-lg mx-auto">
-              The reading is on us. Pay only when you want unlimited briefings or pro features.
-            </p>
-          </ScrollReveal>
-
-          <div className="grid md:grid-cols-2 gap-px bg-rule-bold border border-rule-bold max-w-4xl mx-auto">
-            <ScrollReveal className="bg-paper-card p-10">
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="font-display text-3xl font-semibold tracking-tight">Free</h3>
-                <span className="dateline">Forever</span>
-              </div>
-              <div className="flex items-baseline gap-2 mb-8">
-                <span className="font-display text-7xl font-semibold tracking-tight">$0</span>
-                <span className="text-ink-mute text-lg">/month</span>
-              </div>
-              <ul className="space-y-3 text-[14px] text-ink-2 mb-10">
-                {["3 briefings per day", "Daily email digest", "Up to 8 topics", "Shareable permalink"].map((f) => (
-                  <li key={f} className="flex items-center gap-3">
-                    <svg width="14" height="14" viewBox="0 0 14 14" className="text-signal" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m3 7 3 3 5-6" /></svg>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <SignUpButton mode="modal">
-                <MagneticButton className="w-full px-5 py-3.5 bg-ink text-paper text-[14px] font-semibold tracking-tight hover:bg-signal transition-colors duration-300 flex items-center justify-center gap-2">
-                  Start for free
-                  <ArrowRight />
-                </MagneticButton>
-              </SignUpButton>
-            </ScrollReveal>
-
-            <ScrollReveal className="bg-paper p-10 relative" delay={0.1}>
-              <div className="absolute top-4 right-4 px-2 py-0.5 bg-signal text-paper text-[10px] font-mono uppercase tracking-widest">
-                Soon
-              </div>
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="font-display text-3xl font-semibold tracking-tight">Pro</h3>
-                <span className="dateline text-signal">Coming Q2</span>
-              </div>
-              <div className="flex items-baseline gap-2 mb-8">
-                <span className="font-display text-7xl font-semibold tracking-tight text-ink-mute">$12</span>
-                <span className="text-ink-dim text-lg">/month</span>
-              </div>
-              <ul className="space-y-3 text-[14px] text-ink-mute mb-10">
-                {["Unlimited briefings", "Custom topic creation", "Multiple daily digests", "Priority synthesis queue"].map((f) => (
-                  <li key={f} className="flex items-center gap-3">
-                    <svg width="14" height="14" viewBox="0 0 14 14" className="text-ink-dim" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m3 7 3 3 5-6" /></svg>
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <button disabled className="w-full px-5 py-3.5 border border-rule-strong text-[14px] font-semibold text-ink-dim cursor-not-allowed">
-                Notify me
-              </button>
-            </ScrollReveal>
-          </div>
-        </div>
-      </section>
-
-      {/* ════════════ FINAL CTA ════════════ */}
-      <section className="border-b border-rule-bold relative overflow-hidden">
-        <div className="absolute inset-0 bg-grid pointer-events-none opacity-40" />
-        <div className="relative max-w-[1280px] mx-auto px-6 py-28 md:py-36 text-center">
-          <ScrollReveal>
-            <div className="eyebrow justify-center mb-6">The wire</div>
-            <h2 className="font-display text-5xl md:text-7xl lg:text-8xl font-semibold tracking-[-0.03em] leading-[0.95] max-w-4xl mx-auto">
-              Stop scrolling.<br />
-              <span className="font-display-italic text-signal">Start reading the </span>
-              <RotatingWord
-                words={["signal.", "wire.", "pulse.", "brief."]}
-                className="font-display-italic text-signal"
-              />
-            </h2>
-            <p className="font-sans text-[16px] md:text-[18px] text-ink-2 max-w-xl mx-auto mt-8 mb-10 leading-relaxed">
-              Free forever for 3 briefings a day. No credit card. Sign up in 10 seconds, read your first wire in 30.
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <SignUpButton mode="modal">
-                <MagneticButton className="inline-flex items-center gap-2 px-7 py-4 bg-ink text-paper text-[15px] font-semibold tracking-tight hover:bg-signal transition-colors duration-300">
-                  Subscribe to The Signal
-                  <ArrowRight />
-                </MagneticButton>
-              </SignUpButton>
+            <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px] text-ink-2">
+              <a href="#features" className={`ink-link rounded-sm py-1 ${FOCUS}`}>Features</a>
+              <a href="#how-it-works" className={`ink-link rounded-sm py-1 ${FOCUS}`}>How it works</a>
               <SignInButton mode="modal">
-                <button className="inline-flex items-center gap-2 px-6 py-4 border border-rule-bold text-[15px] font-medium hover:bg-paper-card transition-colors">
-                  Sign in
-                </button>
+                <button className={`ink-link rounded-sm py-1 ${FOCUS}`}>Sign in</button>
               </SignInButton>
-            </div>
-          </ScrollReveal>
-        </div>
-      </section>
-
-      {/* ════════════ FOOTER MASTHEAD ════════════ */}
-      <footer className="bg-paper">
-        <div className="max-w-[1280px] mx-auto px-6 py-14 grid grid-cols-12 gap-6 items-start">
-          <div className="col-span-12 md:col-span-5">
-            <div className="flex items-center gap-2.5 mb-4">
-              <span className="text-signal"><SignalGlyph size={26} /></span>
-              <span className="font-display text-2xl font-semibold tracking-tight">The Signal</span>
-            </div>
-            <p className="font-display-italic text-[19px] text-ink-2 max-w-sm leading-snug">
-              Real-time tech intelligence. Curated by AI, refined for humans who don&apos;t have time to read everything.
-            </p>
+              <SignUpButton mode="modal">
+                <button className={`ink-link rounded-sm py-1 ${FOCUS}`}>Sign up</button>
+              </SignUpButton>
+            </nav>
           </div>
-          <div className="col-span-12 md:col-span-7 grid grid-cols-3 gap-6 text-[13px]">
-            <div>
-              <p className="dateline mb-4">Product</p>
-              <ul className="space-y-2.5 text-ink-2">
-                <li><a href="#product" className="ink-link">How it works</a></li>
-                <li><a href="#coverage" className="ink-link">Coverage</a></li>
-                <li><a href="#pricing" className="ink-link">Pricing</a></li>
-              </ul>
-            </div>
-            <div>
-              <p className="dateline mb-4">Account</p>
-              <ul className="space-y-2.5 text-ink-2">
-                <li><SignInButton mode="modal"><button className="ink-link">Sign in</button></SignInButton></li>
-                <li><SignUpButton mode="modal"><button className="ink-link">Sign up</button></SignUpButton></li>
-              </ul>
-            </div>
-            <div>
-              <p className="dateline mb-4">Legal</p>
-              <ul className="space-y-2.5 text-ink-2">
-                <li><a href="#" className="ink-link">Privacy</a></li>
-                <li><a href="#" className="ink-link">Terms</a></li>
-              </ul>
+          <div className="border-t border-rule">
+            <div className="max-w-6xl mx-auto px-5 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3 dateline">
+              <span>© {new Date().getFullYear()} The Signal</span>
+              <span className="flex items-center gap-2"><span className="live-dot" /> All systems operational</span>
             </div>
           </div>
-        </div>
-        <div className="border-t border-rule-bold">
-          <div className="max-w-[1280px] mx-auto px-6 py-5 flex flex-wrap items-center justify-between gap-3 text-[11px] font-mono text-ink-mute uppercase tracking-[0.16em]">
-            <span>© {TODAY.getFullYear()} The Signal · Editorial Wire Service</span>
-            <span className="flex items-center gap-2"><span className="live-dot" /> All systems operational</span>
-            <span>v1.0</span>
-          </div>
-        </div>
-      </footer>
-    </div>
+        </footer>
+      </div>
+    </MotionConfig>
   );
 }

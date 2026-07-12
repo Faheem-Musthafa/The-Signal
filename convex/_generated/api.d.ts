@@ -11,6 +11,7 @@
 import type * as crons from "../crons.js";
 import type * as digests from "../digests.js";
 import type * as internal_cleanup from "../internal/cleanup.js";
+import type * as internal_showcase from "../internal/showcase.js";
 import type * as internal_subscribers from "../internal/subscribers.js";
 import type * as lib_emailTemplate from "../lib/emailTemplate.js";
 import type * as lib_llm from "../lib/llm.js";
@@ -29,6 +30,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   digests: typeof digests;
   "internal/cleanup": typeof internal_cleanup;
+  "internal/showcase": typeof internal_showcase;
   "internal/subscribers": typeof internal_subscribers;
   "lib/emailTemplate": typeof lib_emailTemplate;
   "lib/llm": typeof lib_llm;

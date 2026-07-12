@@ -241,8 +241,11 @@ export default function HomePage() {
   // Wait for Clerk before deciding
   if (!isLoaded) {
     return (
-      <div className="min-h-screen bg-paper flex items-center justify-center">
-        <div className="border-2 border-ink bg-paper-card px-6 py-4 dateline">Restoring your session…</div>
+      <div className="min-h-screen bg-paper flex items-center justify-center" role="status" aria-label="Loading">
+        <svg width="40" height="40" viewBox="0 0 32 32" fill="none" className="text-signal animate-pulse-soft" aria-hidden="true">
+          <path d="M2 16c5 0 5-9 11-9s5 18 11 18 5-9 6-9" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          <circle cx="16" cy="16" r="1.6" fill="currentColor" />
+        </svg>
       </div>
     );
   }

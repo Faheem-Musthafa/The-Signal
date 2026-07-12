@@ -3,61 +3,61 @@
 @tailwind utilities;
 
 /* ────────────────────────────────────────────
-   THE SIGNAL — Editorial Wire Service
-   Newspaper stock × terminal × magazine
+   THE SIGNAL — Clean modern SaaS
+   White surface × zinc neutrals × electric blue
    ──────────────────────────────────────────── */
 
 @layer base {
   :root {
-    /* Paper & ink — warm cream stock, rich black */
-    --paper:        #f1e9d6;
-    --paper-soft:   #ede4cd;
-    --paper-deep:   #e3d9bf;
-    --paper-card:   #f6efde;
+    /* Surfaces — pure white with cool zinc steps */
+    --paper:        #ffffff;
+    --paper-soft:   #fafafa;
+    --paper-deep:   #f4f4f5;
+    --paper-card:   #ffffff;
 
-    --ink:          #0e0d0a;
-    --ink-2:        #2a2925;
-    --ink-mute:     #6b6760;
-    --ink-dim:      #948f84;
-    --ink-faint:    #b8b1a1;
+    --ink:          #09090b;
+    --ink-2:        #3f3f46;
+    --ink-mute:     #71717a;
+    --ink-dim:      #a1a1aa;
+    --ink-faint:    #d4d4d8;
 
     /* Hairlines */
-    --rule:         #c9bea4;
-    --rule-strong:  #847c69;
-    --rule-bold:    #2a2925;
+    --rule:         #e4e4e7;
+    --rule-strong:  #d4d4d8;
+    --rule-bold:    #e4e4e7;
 
-    /* Signal — newspaper-red breaking news */
-    --signal:       #d6321b;
-    --signal-deep:  #a8230f;
-    --signal-soft:  #f3d4cd;
+    /* Signal — electric blue */
+    --signal:       #2563eb;
+    --signal-deep:  #1d4ed8;
+    --signal-soft:  #eff6ff;
 
     /* Secondary accents */
-    --amber:        #c97014;
-    --moss:         #2d6048;
-    --sky:          #1e528d;
+    --amber:        #d97706;
+    --moss:         #059669;
+    --sky:          #0ea5e9;
 
     /* Legacy aliases — keep old code compiling */
-    --bg:           #f1e9d6;
-    --bg-2:         #ede4cd;
-    --bg-3:         #e3d9bf;
-    --surface:      rgba(14, 13, 10, 0.025);
-    --surface-2:    rgba(14, 13, 10, 0.05);
-    --surface-3:    rgba(14, 13, 10, 0.08);
-    --border:       #c9bea4;
-    --border-strong: #847c69;
-    --border-bright: #2a2925;
-    --text:         #0e0d0a;
-    --text-muted:   #6b6760;
-    --text-dim:     #948f84;
-    --text-faint:   #b8b1a1;
-    --accent:       #d6321b;
-    --accent-hover: #a8230f;
-    --accent-warm:  #c97014;
-    --accent-soft:  rgba(214, 50, 27, 0.12);
-    --signal-yellow: #f5d90a;
-    --warm:         #c97014;
-    --green:        #2d6048;
-    --red:          #d6321b;
+    --bg:           #ffffff;
+    --bg-2:         #fafafa;
+    --bg-3:         #f4f4f5;
+    --surface:      rgba(9, 9, 11, 0.02);
+    --surface-2:    rgba(9, 9, 11, 0.04);
+    --surface-3:    rgba(9, 9, 11, 0.07);
+    --border:       #e4e4e7;
+    --border-strong: #d4d4d8;
+    --border-bright: #a1a1aa;
+    --text:         #09090b;
+    --text-muted:   #71717a;
+    --text-dim:     #a1a1aa;
+    --text-faint:   #d4d4d8;
+    --accent:       #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-warm:  #d97706;
+    --accent-soft:  rgba(37, 99, 235, 0.1);
+    --signal-yellow: #eab308;
+    --warm:         #d97706;
+    --green:        #059669;
+    --red:          #dc2626;
   }
 }
 
@@ -71,26 +71,18 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: "ss01", "ss02", "cv11";
-  /* Subtle paper grain — overlays the whole page */
-  background-image:
-    radial-gradient(circle at 25% 20%, rgba(214, 50, 27, 0.025) 0%, transparent 40%),
-    radial-gradient(circle at 75% 80%, rgba(45, 96, 72, 0.02) 0%, transparent 50%),
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='3'/><feColorMatrix values='0 0 0 0 0.05 0 0 0 0 0.05 0 0 0 0 0.04 0 0 0 0.07 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-  background-attachment: fixed;
 }
 
 /* ────────── Typography ────────── */
 
 .font-display {
-  font-family: var(--font-fraunces), Georgia, serif;
-  font-feature-settings: "ss01", "ss02";
-  letter-spacing: -0.025em;
+  font-family: var(--font-geist), system-ui, sans-serif;
+  letter-spacing: -0.03em;
 }
 
 .font-display-italic {
-  font-family: var(--font-fraunces), Georgia, serif;
+  font-family: var(--font-geist), system-ui, sans-serif;
   font-style: italic;
-  font-feature-settings: "ss01";
   letter-spacing: -0.02em;
 }
 
@@ -104,55 +96,53 @@ body {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-fraunces), Georgia, serif;
-  letter-spacing: -0.025em;
+  font-family: var(--font-geist), system-ui, sans-serif;
+  letter-spacing: -0.03em;
   color: var(--ink);
 }
 
-/* ────────── Editorial atoms ────────── */
+/* ────────── UI atoms ────────── */
 
-/* Section eyebrow — "■ SECTION" */
+/* Section eyebrow — "• SECTION" */
 .eyebrow {
   display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
-  font-family: var(--font-mono), ui-monospace, monospace;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.18em;
+  gap: 0.5rem;
+  font-family: var(--font-geist), system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink-mute);
+  color: var(--signal);
 }
 .eyebrow::before {
   content: "";
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
   background: var(--signal);
   display: inline-block;
 }
 
-/* Dateline — newspaper byline style */
+/* Small metadata label */
 .dateline {
   font-family: var(--font-mono), monospace;
-  font-size: 10px;
-  letter-spacing: 0.14em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-mute);
 }
 
-/* Drop cap — first-letter newspaper flourish */
 .drop-cap::first-letter {
-  font-family: var(--font-fraunces), Georgia, serif;
-  font-size: 4.2em;
-  font-weight: 600;
-  font-style: italic;
+  font-size: 3.6em;
+  font-weight: 700;
   float: left;
-  line-height: 0.85;
-  margin: 0.1em 0.12em -0.05em 0;
+  line-height: 0.9;
+  margin: 0.06em 0.12em -0.05em 0;
   color: var(--signal);
 }
 
-/* Yellow editorial highlight (kept as backup, but primary accent is now red ink) */
+/* Soft highlight */
 .signal-mark {
   background: linear-gradient(transparent 60%, var(--signal-soft) 60%);
   padding: 0 0.05em;
@@ -166,13 +156,14 @@ h1, h2, h3, h4, h5, h6 {
   text-decoration: none;
   color: var(--ink);
   background-image: linear-gradient(var(--signal), var(--signal));
-  background-size: 100% 1px;
+  background-size: 0% 1.5px;
   background-repeat: no-repeat;
   background-position: 0 100%;
-  transition: background-size 0.3s ease;
+  transition: background-size 0.25s ease, color 0.25s ease;
 }
 .ink-link:hover {
-  background-size: 100% 2px;
+  color: var(--signal);
+  background-size: 100% 1.5px;
 }
 
 /* ────────── Surfaces & rules ────────── */
@@ -180,46 +171,50 @@ h1, h2, h3, h4, h5, h6 {
 .elev-1 {
   background: var(--paper-card);
   border: 1px solid var(--rule);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(9, 9, 11, 0.04);
 }
 
 .elev-flat {
   background: transparent;
   border: 1px solid var(--rule);
+  border-radius: 12px;
 }
 
 .glass {
-  background: rgba(241, 233, 214, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--rule);
 }
 
 .glass-card {
   background: var(--paper-card);
   border: 1px solid var(--rule);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(9, 9, 11, 0.04);
 }
 
 .glass-panel {
   background: var(--paper-soft);
   border: 1px solid var(--rule);
+  border-radius: 12px;
 }
 
-/* Heavy rule — newspaper section divider */
 .rule-thick {
-  border-top: 3px double var(--rule-bold);
+  border-top: 1px solid var(--rule-strong);
 }
 
 .rule-fold {
-  border-top: 1px solid var(--rule-bold);
-  border-bottom: 1px solid var(--rule-bold);
+  border-bottom: 1px solid var(--rule);
   padding: 4px 0;
 }
 
 /* Grid background — faint */
 .bg-grid {
   background-image:
-    linear-gradient(to right, rgba(14, 13, 10, 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(14, 13, 10, 0.04) 1px, transparent 1px);
+    linear-gradient(to right, rgba(9, 9, 11, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(9, 9, 11, 0.035) 1px, transparent 1px);
   background-size: 64px 64px;
 }
 
@@ -228,7 +223,6 @@ h1, h2, h3, h4, h5, h6 {
   mask-image: radial-gradient(ellipse 70% 50% at 50% 0%, #000 50%, transparent 100%);
 }
 
-/* Ruled paper — horizontal lines like newsprint columns */
 .bg-ruled {
   background-image: repeating-linear-gradient(
     to bottom,
@@ -243,13 +237,13 @@ h1, h2, h3, h4, h5, h6 {
 
 ::selection {
   background: var(--signal);
-  color: var(--paper);
+  color: #ffffff;
 }
 
-*::-webkit-scrollbar { width: 10px; height: 10px; }
-*::-webkit-scrollbar-track { background: var(--paper); }
-*::-webkit-scrollbar-thumb { background: var(--rule-strong); border: 2px solid var(--paper); border-radius: 0; }
-*::-webkit-scrollbar-thumb:hover { background: var(--ink); }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--ink-faint); border-radius: 999px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--ink-dim); }
 
 /* ────────── Animations ────────── */
 
@@ -291,7 +285,6 @@ h1, h2, h3, h4, h5, h6 {
   animation: ticker-line 3s ease-in-out infinite;
 }
 
-/* Marquee scroll for wire ticker */
 @keyframes marquee {
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
@@ -314,7 +307,6 @@ h1, h2, h3, h4, h5, h6 {
   animation: blink 1.1s steps(1) infinite;
 }
 
-/* Subtle scale on hover for cards */
 @keyframes wiggle-rotate {
   0%, 100% { transform: rotate(0deg); }
   25% { transform: rotate(-1deg); }
@@ -325,7 +317,7 @@ h1, h2, h3, h4, h5, h6 {
   animation: wiggle-rotate 0.4s ease-in-out;
 }
 
-/* Live dot — burnt orange terminal pulse */
+/* Live dot — blue pulse */
 .live-dot {
   position: relative;
   display: inline-block;
@@ -345,4 +337,18 @@ h1, h2, h3, h4, h5, h6 {
 @keyframes live-pulse {
   0% { transform: scale(1); opacity: 0.6; }
   100% { transform: scale(2.4); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up,
+  .animate-shimmer,
+  .animate-pulse-soft,
+  .animate-ticker,
+  .animate-marquee,
+  .animate-marquee-fast,
+  .animate-blink,
+  .animate-wiggle,
+  .live-dot::after {
+    animation: none;
+  }
 }

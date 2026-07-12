@@ -1,18 +1,10 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { Toaster } from "@/components/toaster";
-import { Fraunces, Geist, JetBrains_Mono } from "next/font/google";
+import { Geist, JetBrains_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
-// Display serif — distinctive, has a beautiful italic, variable optical sizing
-const fraunces = Fraunces({
-  subsets: ["latin"],
-  variable: "--font-fraunces",
-  axes: ["opsz", "SOFT", "WONK"],
-  display: "swap",
-});
-
-// Body sans — Vercel's Geist, modern but characterful (not Inter)
+// Body + display sans — Vercel's Geist
 const geist = Geist({
   subsets: ["latin"],
   variable: "--font-geist",
@@ -37,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${geist.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className={`${geist.variable} ${jetbrainsMono.variable}`}>
       <body>
         <ClerkProvider>
           <Toaster />

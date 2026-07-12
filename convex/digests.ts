@@ -156,3 +156,35 @@ export const getByShareId = query({
     };
   },
 });
+
+export const landingStats = query({
+  args: {},
+  handler: async (ctx) => {
+    // ponytail: full scan is fine — digests expire after 24h, so the table only
+    // ever holds a day's worth of rows; revisit if retention grows
+    const docs = await ctx.db.query("digests").collect();
+    const now = Date.now();
+    const live = docs.filter((d) => d.expiresAt > now);
+    const latest = live.reduce<(typeof live)[number] | null>(
+      (best, d) => (best === null || d.generatedAt > best.generatedAt ? d : best),
+      null,
+    );
+
+    return {
+      briefingsLast24h: live.length,
+      latest: latest
+        ? {
+            topics: latest.topics,
+            generatedAt: latest.generatedAt,
+            stories: latest.stories.slice(0, 4).map((s) => ({
+              headline: s.headline,
+              category: s.category,
+              importance: s.importance,
+              signal: s.signal,
+              source: s.source,
+            })),
+          }
+        : null,
+    };
+  },
+});

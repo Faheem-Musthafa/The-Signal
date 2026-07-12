@@ -23,19 +23,15 @@ export default async function SharePage({
   if (!digest) notFound();
 
   return (
-    <main className="min-h-screen bg-bg text-text relative overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[300px] bg-accent/8 blur-[120px] rounded-full opacity-40" />
-      </div>
-
+    <main className="min-h-screen bg-paper-soft text-ink relative overflow-hidden">
       <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 py-10 md:py-14">
-        <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-12 pb-8 border-b border-border">
+        <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-12 pb-8 border-b border-rule">
           <div className="flex items-start gap-4">
-            <div className="w-9 h-9 rounded-lg bg-accent-soft text-accent flex items-center justify-center shrink-0 mt-1">
+            <div className="w-9 h-9 rounded-lg bg-signal-soft text-signal flex items-center justify-center shrink-0 mt-1">
               <Mark />
             </div>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-dim mb-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-dim mb-1.5">
                 Shared briefing · The Signal
               </p>
               <h1 className="text-3xl md:text-4xl font-semibold tracking-tight mb-3">
@@ -45,11 +41,11 @@ export default async function SharePage({
                   day: "numeric",
                 })}
               </h1>
-              <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-text-dim">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-ink-mute">
                 <span>{new Date(digest.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                <span className="text-text-dim/40">·</span>
-                <span className="text-accent">{digest.model}</span>
-                <span className="text-text-dim/40">·</span>
+                <span className="text-ink-faint">·</span>
+                <span className="text-signal">{digest.model}</span>
+                <span className="text-ink-faint">·</span>
                 <span>{digest.topics.join(" · ")}</span>
               </div>
             </div>
@@ -57,7 +53,7 @@ export default async function SharePage({
 
           <Link
             href="/"
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-accent text-white font-semibold text-sm hover:bg-accent-hover transition-colors"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-signal text-white font-semibold text-sm hover:bg-signal-deep transition-colors"
           >
             Get your own briefing
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -73,25 +69,25 @@ export default async function SharePage({
             return (
               <article
                 key={i}
-                className={`elev-1 rounded-xl p-6 flex flex-col group hover:border-border-strong transition-all ${
+                className={`elev-1 rounded-xl p-6 flex flex-col group hover:shadow-md transition-shadow ${
                   isHero ? "md:col-span-2 lg:col-span-3" : ""
                 }`}
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider ${
-                      isHero ? "bg-accent-soft text-accent border border-accent/20" : "bg-surface border border-border text-text-muted"
+                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
+                      isHero ? "bg-signal-soft text-signal" : "bg-paper-soft border border-rule text-ink-mute"
                     }`}>
                       {story.category}
                     </span>
-                    <span className="text-[11px] text-text-dim">{story.source}</span>
+                    <span className="text-[11px] text-ink-mute">{story.source}</span>
                   </div>
 
                   <div className="flex gap-1" title={`Importance: ${story.importance}/5`}>
                     {Array.from({ length: 5 }).map((_, j) => (
                       <div
                         key={j}
-                        className={`w-1 h-1 rounded-full ${j < story.importance ? "bg-accent-warm" : "bg-surface-3"}`}
+                        className={`w-1 h-1 rounded-full ${j < story.importance ? "bg-signal" : "bg-rule"}`}
                       />
                     ))}
                   </div>
@@ -103,14 +99,14 @@ export default async function SharePage({
                   {story.headline}
                 </h2>
 
-                <div className="rounded-lg border border-border bg-bg p-4 mb-4 mt-auto">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-accent mb-2">The Signal</p>
-                  <p className={`font-medium leading-relaxed text-text ${isHero ? "text-base md:text-lg" : "text-sm"}`}>
+                <div className="rounded-lg bg-signal-soft p-4 mb-4 mt-auto">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-signal mb-2">The Signal</p>
+                  <p className={`font-medium leading-relaxed text-ink ${isHero ? "text-base md:text-lg" : "text-sm"}`}>
                     {story.signal}
                   </p>
                 </div>
 
-                <p className={`leading-relaxed text-text-muted ${isHero ? "text-sm md:text-base max-w-3xl" : "text-xs"}`}>
+                <p className={`leading-relaxed text-ink-mute ${isHero ? "text-sm md:text-base max-w-3xl" : "text-xs"}`}>
                   {story.summary}
                 </p>
               </article>
@@ -118,10 +114,10 @@ export default async function SharePage({
           })}
         </div>
 
-        <footer className="mt-16 pt-8 border-t border-border flex items-center justify-between text-xs text-text-dim">
+        <footer className="mt-16 pt-8 border-t border-rule flex items-center justify-between text-xs text-ink-mute">
           <span>
             Powered by{" "}
-            <Link href="/" className="text-text hover:text-accent transition-colors">
+            <Link href="/" className="text-ink hover:text-signal transition-colors">
               The Signal
             </Link>
           </span>

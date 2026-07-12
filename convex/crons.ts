@@ -24,4 +24,11 @@ crons.interval(
   {},
 );
 
+crons.interval(
+  "generate showcase digest for landing page",
+  { hours: 5 },
+  internal.internal.showcase.generateShowcaseDigest,
+  {},
+);
+
 export default crons;

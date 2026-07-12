@@ -54,6 +54,8 @@ const TOPIC_QUERY_MAP: Record<string, string[]> = {
   ],
 };
 
+export const SUPPORTED_TOPICS = Object.keys(TOPIC_QUERY_MAP);
+
 export type GeneratedStory = {
   headline: string;
   category: string;

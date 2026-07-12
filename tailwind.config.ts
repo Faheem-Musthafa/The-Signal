@@ -51,7 +51,7 @@ const config: Config = {
         "accent-soft": "var(--accent-soft)",
       },
       fontFamily: {
-        display: ["var(--font-fraunces)", "Georgia", "serif"],
+        display: ["var(--font-geist)", "system-ui", "sans-serif"],
         sans: ["var(--font-geist)", "system-ui", "sans-serif"],
         mono: ["var(--font-mono)", "ui-monospace", "monospace"],
       },
