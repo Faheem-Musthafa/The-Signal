@@ -7,6 +7,10 @@ const OPENROUTER_MODELS_ENDPOINT = "https://openrouter.ai/api/v1/models";
 const MAX_CONTEXT_CHARS = 30000;
 const MAX_SNIPPET_CHARS = 1200;
 const FIRECRAWL_TIME_FILTER = "sbd:1,qdr:d";
+const FIRECRAWL_TIMEOUT_MS = 12_000;
+const OPENROUTER_TIMEOUT_MS = 28_000;
+const MAX_SEARCH_QUERIES = 8;
+const DEFAULT_OPENROUTER_MAX_TOKENS = 1600;
 const DEFAULT_OPENROUTER_MODEL_CANDIDATES = [
   "google/gemini-2.5-flash",
   "google/gemini-2.0-flash-001",
@@ -18,6 +22,10 @@ type OpenRouterResult = {
   status: number;
   body?: string;
   content?: string;
+};
+
+type RunOptions = {
+  signal?: AbortSignal;
 };
 
 function requireEnv(name: string) {
@@ -69,22 +77,61 @@ export async function getAvailableOpenRouterModels() {
   return new Set((data.data ?? []).map((item) => item.id).filter((id): id is string => !!id));
 }
 
-function resolveOpenRouterMaxTokens() {
+export function getOpenRouterMaxTokens() {
   const raw = process.env.OPENROUTER_MAX_TOKENS;
-  const parsed = raw ? Number(raw) : 2000;
+  const parsed = raw ? Number(raw) : DEFAULT_OPENROUTER_MAX_TOKENS;
 
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    return 2000;
+    return DEFAULT_OPENROUTER_MAX_TOKENS;
   }
 
-  // Keep completion budget bounded for predictable cost.
-  return Math.min(Math.floor(parsed), 4000);
+  // Five to seven concise stories fit comfortably while keeping low-credit
+  // OpenRouter accounts from rejecting the request before inference starts.
+  return Math.min(Math.floor(parsed), DEFAULT_OPENROUTER_MAX_TOKENS);
 }
 
 function truncateText(value: unknown, maxChars: number) {
   if (typeof value !== "string") return "";
   if (value.length <= maxChars) return value;
   return `${value.slice(0, maxChars)}...`;
+}
+
+async function fetchWithTimeout(
+  input: string,
+  init: RequestInit,
+  timeoutMs: number,
+  provider: string,
+) {
+  const controller = new AbortController();
+  const parentSignal = init.signal;
+  let timedOut = false;
+
+  const abortFromParent = () => controller.abort(parentSignal?.reason);
+  if (parentSignal?.aborted) {
+    abortFromParent();
+  } else {
+    parentSignal?.addEventListener("abort", abortFromParent, { once: true });
+  }
+
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (timedOut) {
+      throw new Error(`${provider} timed out after ${Math.round(timeoutMs / 1000)}s`);
+    }
+    if (parentSignal?.aborted) {
+      throw new Error("Digest generation timed out");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    parentSignal?.removeEventListener("abort", abortFromParent);
+  }
 }
 
 function buildCompactContext(searchResults: unknown[]) {
@@ -171,27 +218,22 @@ export function getProviderKeyWarnings() {
   return warnings;
 }
 
-async function runFirecrawlSearch(query: string, apiKey: string) {
-  const response = await fetch(FIRECRAWL_ENDPOINT, {
+async function runFirecrawlSearch(query: string, apiKey: string, signal?: AbortSignal) {
+  const response = await fetchWithTimeout(FIRECRAWL_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
+    signal,
     body: JSON.stringify({
       query,
-      limit: 3,
+      limit: 5,
       sources: ["news", "web"],
       tbs: FIRECRAWL_TIME_FILTER,
       country: process.env.FIRECRAWL_COUNTRY ?? "US",
-      scrapeOptions: {
-        formats: ["markdown"],
-        onlyMainContent: true,
-        maxAge: 0,
-        storeInCache: false,
-      },
     }),
-  });
+  }, FIRECRAWL_TIMEOUT_MS, "Firecrawl");
 
   if (!response.ok) {
     const body = await response.text();
@@ -206,20 +248,22 @@ async function runOpenRouterCompletion(
   prompt: string,
   maxTokens: number,
   apiKey: string,
+  signal?: AbortSignal,
 ): Promise<OpenRouterResult> {
-  const response = await fetch(OPENROUTER_ENDPOINT, {
+  const response = await fetchWithTimeout(OPENROUTER_ENDPOINT, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
+    signal,
     body: JSON.stringify({
       model,
       messages: [{ role: "user", content: prompt }],
       temperature: 0.2,
       max_tokens: maxTokens,
     }),
-  });
+  }, OPENROUTER_TIMEOUT_MS, "OpenRouter");
 
   if (!response.ok) {
     return {
@@ -242,17 +286,18 @@ async function runOpenRouterCompletion(
 
 function shouldTryNextModel(status: number, body: string | undefined) {
   // Retryable per-model failures: missing model, provider down, rate limited.
-  if ([404, 429, 500, 502, 503].includes(status)) {
+  if ([402, 404, 429, 500, 502, 503].includes(status)) {
     return true;
   }
 
   return /No endpoints found|provider unavailable|model.*not found/i.test(body ?? "");
 }
 
-async function runFirecrawlSearches(queries: string[], apiKey: string) {
+async function runFirecrawlSearches(queries: string[], apiKey: string, signal?: AbortSignal) {
+  const startedAt = Date.now();
   // One failed query must not kill the whole briefing — use what succeeded.
   const settled = await Promise.allSettled(
-    queries.map((query) => runFirecrawlSearch(query, apiKey)),
+    queries.map((query) => runFirecrawlSearch(query, apiKey, signal)),
   );
 
   const succeeded = settled
@@ -263,6 +308,9 @@ async function runFirecrawlSearches(queries: string[], apiKey: string) {
   if (failed > 0) {
     console.warn(`[digest.llm] firecrawlPartialFailure failed=${failed}/${settled.length}`);
   }
+  console.info(
+    `[digest.llm] firecrawlComplete succeeded=${succeeded.length}/${settled.length} durationMs=${Date.now() - startedAt}`,
+  );
 
   if (succeeded.length === 0) {
     const first = settled.find((r): r is PromiseRejectedResult => r.status === "rejected");
@@ -275,15 +323,19 @@ async function runFirecrawlSearches(queries: string[], apiKey: string) {
 export async function runFirecrawlAndOpenRouter(
   topics: Topic[],
   date: string,
+  options: RunOptions = {},
 ): Promise<{ content: string; model: string }> {
   const firecrawlApiKey = requireEnv("FIRECRAWL_API_KEY");
   const openRouterApiKey = requireEnv("OPENROUTER_API_KEY");
   assertProviderKeyShape(firecrawlApiKey, openRouterApiKey);
   const modelCandidates = getOpenRouterModelCandidates();
-  const maxTokens = resolveOpenRouterMaxTokens();
+  const maxTokens = getOpenRouterMaxTokens();
 
-  const queries = topics.flatMap((topic) => TOPIC_QUERY_MAP[topic]);
-  const searchResults = await runFirecrawlSearches(queries, firecrawlApiKey);
+  const queriesPerTopic = topics.length <= 2 ? 3 : topics.length <= 4 ? 2 : 1;
+  const queries = topics
+    .flatMap((topic) => TOPIC_QUERY_MAP[topic].slice(0, queriesPerTopic))
+    .slice(0, MAX_SEARCH_QUERIES);
+  const searchResults = await runFirecrawlSearches(queries, firecrawlApiKey, options.signal);
 
   const context = buildCompactContext(searchResults);
   const finalPrompt = buildDigestPrompt({ date, topics, context });
@@ -295,7 +347,24 @@ export async function runFirecrawlAndOpenRouter(
   let lastError: Error | null = null;
 
   for (const model of modelCandidates) {
-    const result = await runOpenRouterCompletion(model, finalPrompt, maxTokens, openRouterApiKey);
+    const modelStartedAt = Date.now();
+    let result: OpenRouterResult;
+    try {
+      result = await runOpenRouterCompletion(
+        model,
+        finalPrompt,
+        maxTokens,
+        openRouterApiKey,
+        options.signal,
+      );
+    } catch (error) {
+      if (options.signal?.aborted) throw error;
+      lastError = error instanceof Error ? error : new Error("OpenRouter request failed");
+      console.warn(
+        `[digest.llm] modelRequestFailed model=${model} durationMs=${Date.now() - modelStartedAt} reason=${truncateText(lastError.message, 240)}`,
+      );
+      continue;
+    }
 
     if (result.ok) {
       if (!result.content?.trim()) {
@@ -303,7 +372,9 @@ export async function runFirecrawlAndOpenRouter(
         lastError = new Error(`Model ${model} returned an empty completion`);
         continue;
       }
-      console.info(`[digest.llm] selectedModel=${model}`);
+      console.info(
+        `[digest.llm] selectedModel=${model} durationMs=${Date.now() - modelStartedAt}`,
+      );
       return { content: result.content, model };
     }
 

@@ -24,9 +24,9 @@ export default async function SharePage({
 
   return (
     <main className="min-h-screen bg-paper-soft text-ink relative overflow-hidden">
-      <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 py-10 md:py-14">
-        <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-12 pb-8 border-b border-rule">
-          <div className="flex items-start gap-4">
+      <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 py-7 sm:py-10 md:py-14">
+        <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-8 sm:mb-12 pb-7 sm:pb-8 border-b border-rule">
+          <div className="flex items-start gap-3 sm:gap-4">
             <div className="w-9 h-9 rounded-lg bg-signal-soft text-signal flex items-center justify-center shrink-0 mt-1">
               <Mark />
             </div>
@@ -53,7 +53,7 @@ export default async function SharePage({
 
           <Link
             href="/"
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-signal text-white font-semibold text-sm hover:bg-signal-deep transition-colors"
+            className="inline-flex min-h-12 items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-signal text-white font-semibold text-sm hover:bg-signal-deep transition-colors"
           >
             Get your own briefing
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -69,21 +69,21 @@ export default async function SharePage({
             return (
               <article
                 key={i}
-                className={`elev-1 rounded-xl p-6 flex flex-col group hover:shadow-md transition-shadow ${
+                className={`elev-1 rounded-xl p-5 sm:p-6 flex flex-col group hover:shadow-md transition-shadow ${
                   isHero ? "md:col-span-2 lg:col-span-3" : ""
                 }`}
               >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
                       isHero ? "bg-signal-soft text-signal" : "bg-paper-soft border border-rule text-ink-mute"
                     }`}>
                       {story.category}
                     </span>
-                    <span className="text-[11px] text-ink-mute">{story.source}</span>
+                    <span className="max-w-full truncate text-[11px] text-ink-mute">{story.source}</span>
                   </div>
 
-                  <div className="flex gap-1" title={`Importance: ${story.importance}/5`}>
+                  <div className="flex shrink-0 gap-1 pt-1" title={`Importance: ${story.importance}/5`}>
                     {Array.from({ length: 5 }).map((_, j) => (
                       <div
                         key={j}
@@ -94,7 +94,7 @@ export default async function SharePage({
                 </div>
 
                 <h2 className={`font-semibold mb-4 leading-snug tracking-tight ${
-                  isHero ? "text-2xl md:text-4xl max-w-3xl" : "text-base"
+                  isHero ? "text-2xl sm:text-3xl md:text-4xl max-w-3xl" : "text-base"
                 }`}>
                   {story.headline}
                 </h2>
@@ -114,7 +114,7 @@ export default async function SharePage({
           })}
         </div>
 
-        <footer className="mt-16 pt-8 border-t border-rule flex items-center justify-between text-xs text-ink-mute">
+        <footer className="mt-12 sm:mt-16 pt-8 border-t border-rule flex flex-col items-start justify-between gap-3 text-xs text-ink-mute min-[380px]:flex-row min-[380px]:items-center">
           <span>
             Powered by{" "}
             <Link href="/" className="text-ink hover:text-signal transition-colors">

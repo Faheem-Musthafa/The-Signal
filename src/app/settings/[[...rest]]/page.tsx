@@ -17,7 +17,7 @@ export default function SettingsPage() {
   if (!isSignedIn) {
     return (
       <AppShell pageTitle="Settings">
-        <div className="bg-white border border-rule rounded-xl shadow-sm p-8 max-w-md">
+        <div className="bg-white border border-rule rounded-xl shadow-sm p-5 sm:p-8 max-w-md">
           <div className="eyebrow mb-3">Settings</div>
           <p className="font-display text-2xl font-semibold tracking-tight mb-3">Sign in to continue.</p>
           <p className="text-[14px] text-ink-2 mb-5">Manage your account, topics, and delivery preferences.</p>
@@ -52,8 +52,9 @@ export default function SettingsPage() {
                 fontFamily: "var(--font-geist)",
               },
               elements: {
-                rootBox: "w-full",
-                card: "bg-white shadow-sm border border-rule rounded-xl",
+                rootBox: "w-full max-w-full",
+                cardBox: "w-full max-w-full",
+                card: "w-full max-w-full overflow-hidden bg-white shadow-sm border border-rule rounded-xl",
                 navbar: "border-r border-rule bg-paper-soft",
                 navbarButton: "text-ink-mute hover:text-ink",
                 pageScrollBox: "bg-white",

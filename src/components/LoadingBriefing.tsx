@@ -25,7 +25,7 @@ export function LoadingBriefing({ message }: LoadingBriefingProps) {
       aria-live="polite"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-rule bg-paper-soft">
+      <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-rule bg-paper-soft">
         <span className="flex items-center gap-2">
           <span className="live-dot" />
           <span className="text-[12px] font-medium text-ink">Scanning the wire</span>
@@ -34,7 +34,7 @@ export function LoadingBriefing({ message }: LoadingBriefingProps) {
       </div>
 
       {/* Signal trace — the briefing being pulled out of the noise */}
-      <div className="px-6 pt-6">
+      <div className="px-4 sm:px-6 pt-6">
         <svg viewBox="0 0 264 40" className="w-full h-10 text-signal" fill="none" aria-hidden="true">
           <path d={WAVE} stroke="var(--rule)" strokeWidth="1.5" strokeLinecap="round" />
           {reduceMotion ? (
@@ -55,7 +55,7 @@ export function LoadingBriefing({ message }: LoadingBriefingProps) {
       </div>
 
       {/* Stage message */}
-      <div className="px-6 pt-4">
+      <div className="px-4 sm:px-6 pt-4">
         <motion.h2
           key={message}
           initial={reduceMotion ? false : { opacity: 0, y: 6 }}
@@ -68,7 +68,7 @@ export function LoadingBriefing({ message }: LoadingBriefingProps) {
       </div>
 
       {/* Briefing skeleton forming underneath */}
-      <div className="px-6 py-6 space-y-3" aria-hidden="true">
+      <div className="px-4 sm:px-6 py-6 space-y-3" aria-hidden="true">
         {SKELETON_WIDTHS.map((w, i) => (
           <div key={i} className="flex items-center gap-3">
             <span className="h-4 w-14 shrink-0 rounded-full bg-paper-deep animate-pulse-soft" style={{ animationDelay: `${i * 150}ms` }} />

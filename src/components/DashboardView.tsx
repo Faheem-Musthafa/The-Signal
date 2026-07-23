@@ -47,10 +47,10 @@ export function DashboardView({
   const canGenerate = selectedTopics.length > 0 && remaining > 0;
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-8 md:space-y-12">
       {/* Stat row */}
       <ScrollReveal>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 min-[340px]:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           <StatBlock label="Today's quota" value={remaining} hint={remaining === 0 ? "Resets at 00:00 UTC" : "briefings remaining"} accent={remaining > 0} />
           <StatBlock label="Topics selected" value={selectedTopics.length} hint="Drop in or out below" />
           <StatBlock label="Briefings today" value={recent.length} hint="Across all topic combos" />
@@ -61,7 +61,7 @@ export function DashboardView({
       {/* Generate panel */}
       <ScrollReveal>
         <section className="rounded-2xl border border-rule bg-paper-card shadow-sm">
-          <div className="flex items-start justify-between gap-4 px-6 md:px-8 pt-6 md:pt-8 pb-5 border-b border-rule">
+          <div className="flex items-start justify-between gap-4 px-4 sm:px-6 md:px-8 pt-5 sm:pt-6 md:pt-8 pb-5 border-b border-rule">
             <div>
               <div className="eyebrow mb-3">New briefing</div>
               <h2 className="text-2xl md:text-3xl font-semibold tracking-tight mb-2">
@@ -77,7 +77,7 @@ export function DashboardView({
             </span>
           </div>
 
-          <div className="px-6 md:px-8 py-6">
+          <div className="px-4 sm:px-6 md:px-8 py-5 sm:py-6">
             {error && (
               <div className="mb-5 px-4 py-3 rounded-lg border border-red-200 bg-red-50 text-[13px] text-red-700">
                 {error}
@@ -91,7 +91,7 @@ export function DashboardView({
                   <StaggerItem key={topic}>
                     <button
                       onClick={() => toggleTopic(topic)}
-                      className={`px-4 py-2 text-[13px] rounded-full border transition-all duration-200 font-medium ${
+                      className={`min-h-11 px-4 py-2.5 text-[13px] rounded-full border transition-all duration-200 font-medium ${
                         isSelected
                           ? "bg-signal text-white border-signal shadow-sm"
                           : "bg-paper border-rule text-ink-mute hover:text-ink hover:border-ink-dim"
@@ -113,7 +113,7 @@ export function DashboardView({
               <MagneticButton
                 onClick={handleGenerate}
                 disabled={!canGenerate}
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-signal text-white font-semibold text-[13px] shadow-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-signal-deep transition-colors duration-200 min-w-[220px]"
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 px-6 py-3 rounded-lg bg-signal text-white font-semibold text-[13px] shadow-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-signal-deep transition-colors duration-200 sm:w-auto sm:min-w-[220px]"
               >
                 {remaining === 0 ? "Quota reached" : "Generate briefing"}
                 {remaining > 0 && (

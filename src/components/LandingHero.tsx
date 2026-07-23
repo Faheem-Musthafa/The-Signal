@@ -318,25 +318,28 @@ export function LandingHero() {
       <div className="min-h-screen w-full bg-paper text-ink relative overflow-x-hidden">
         {/* ── Sticky nav ── */}
         <header className="sticky top-0 z-40 bg-paper/80 backdrop-blur-md border-b border-rule">
-          <div className="max-w-6xl mx-auto px-5 sm:px-6 h-16 flex items-center justify-between gap-4">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
             <div className="flex items-center gap-9">
               <a href="/" className={`flex items-center gap-2.5 rounded-md ${FOCUS}`}>
                 <span className="text-signal"><SignalGlyph size={22} /></span>
-                <span className="font-display text-[19px] font-semibold tracking-tight leading-none">The Signal</span>
+                <span className="font-display text-[18px] sm:text-[19px] font-semibold tracking-tight leading-none">The Signal</span>
               </a>
               <nav aria-label="Main" className="hidden md:flex items-center gap-7 text-[13.5px] font-medium text-ink-2">
                 <a href="#features" className={`ink-link rounded-sm py-2 ${FOCUS}`}>Features</a>
                 <a href="#how-it-works" className={`ink-link rounded-sm py-2 ${FOCUS}`}>How it works</a>
               </nav>
             </div>
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1 sm:gap-2.5">
               <SignInButton mode="modal">
-                <button className={`hidden sm:inline-flex px-3.5 py-2 rounded-lg text-[13.5px] font-medium text-ink-2 hover:text-ink hover:bg-paper-soft transition-colors ${FOCUS}`}>
+                <button className={`inline-flex min-h-11 items-center px-2.5 sm:px-3.5 py-2 rounded-lg text-[13px] sm:text-[13.5px] font-medium text-ink-2 hover:text-ink hover:bg-paper-soft transition-colors ${FOCUS}`}>
                   Sign in
                 </button>
               </SignInButton>
               <SignUpButton mode="modal">
-                <button className={`${BTN_PRIMARY} px-4 py-2 text-[13.5px]`}>Get started</button>
+                <button className={`${BTN_PRIMARY} min-h-11 px-3 sm:px-4 py-2 text-[13px] sm:text-[13.5px]`}>
+                  <span className="sm:hidden">Start</span>
+                  <span className="hidden sm:inline">Get started</span>
+                </button>
               </SignUpButton>
             </div>
           </div>
@@ -345,14 +348,14 @@ export function LandingHero() {
         {/* ── Hero ── */}
         <section className="relative border-b border-rule">
           <div className="absolute inset-0 bg-grid bg-grid-fade pointer-events-none" aria-hidden="true" />
-          <div className="relative max-w-6xl mx-auto px-5 sm:px-6 pt-16 md:pt-24 pb-16 md:pb-24 text-center">
+          <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-12 sm:pt-16 md:pt-24 pb-14 sm:pb-16 md:pb-24 text-center">
             <ScrollReveal>
               <span className="inline-flex items-center gap-2 rounded-full border border-rule bg-paper px-3.5 py-1.5 text-[12px] font-medium text-ink-2 shadow-sm">
                 <span className="live-dot" />
                 Live · AI-curated every day
               </span>
 
-              <h1 className="mt-6 font-display font-semibold tracking-[-0.035em] text-[42px] sm:text-[60px] md:text-[76px] leading-[1.02] max-w-4xl mx-auto text-balance">
+              <h1 className="mt-6 font-display font-semibold tracking-[-0.035em] text-[38px] min-[380px]:text-[42px] sm:text-[60px] md:text-[76px] leading-[1.02] max-w-4xl mx-auto text-balance">
                 Tech news, distilled to <span className="text-signal">the signal</span>.
               </h1>
 
@@ -360,14 +363,14 @@ export function LandingHero() {
                 The Signal scans the live web, scores every story on importance, and hands you a two-minute briefing on the topics you pick. No feed. No filler. No ads.
               </p>
 
-              <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <div className="mt-8 mx-auto flex max-w-xs flex-col items-stretch justify-center gap-3 sm:max-w-none sm:flex-row sm:flex-wrap sm:items-center">
                 <SignUpButton mode="modal">
-                  <MagneticButton className={`${BTN_PRIMARY} px-6 py-3 text-[14.5px] shadow-sm`}>
+                  <MagneticButton className={`${BTN_PRIMARY} min-h-12 w-full px-6 py-3 text-[14.5px] shadow-sm sm:w-auto`}>
                     Get started free
                     <ArrowRight />
                   </MagneticButton>
                 </SignUpButton>
-                <a href="#how-it-works" className={`${BTN_GHOST} px-5 py-3 text-[14.5px]`}>
+                <a href="#how-it-works" className={`${BTN_GHOST} min-h-12 w-full px-5 py-3 text-[14.5px] sm:w-auto`}>
                   See how it works
                 </a>
               </div>
@@ -375,7 +378,7 @@ export function LandingHero() {
               <p className="mt-5 dateline">Free forever · 3 briefings a day · No card required</p>
             </ScrollReveal>
 
-            <ScrollReveal delay={0.15} className="mt-14 md:mt-16">
+            <ScrollReveal delay={0.15} className="mt-12 sm:mt-14 md:mt-16">
               <BriefingMock latest={stats?.latest ?? null} />
             </ScrollReveal>
           </div>
@@ -383,8 +386,8 @@ export function LandingHero() {
 
         {/* ── Trust / meta strip ── */}
         <section className="border-b border-rule bg-paper-soft" aria-label="Product stats">
-          <div className="max-w-6xl mx-auto px-5 sm:px-6 py-10 md:py-12">
-            <StaggerChildren className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-8">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 md:py-12">
+            <StaggerChildren className="grid grid-cols-2 md:grid-cols-4 gap-x-4 sm:gap-x-6 gap-y-8">
               {[
                 { value: <NumberTicker value={stats?.briefingsLast24h ?? 0} />, label: "Briefings generated in the last 24 hours" },
                 { value: <NumberTicker value={ALLOWED_TOPICS.length} />, label: "Curated topics to choose from" },
@@ -404,8 +407,8 @@ export function LandingHero() {
 
         {/* ── Features ── */}
         <section id="features" className="scroll-mt-20 border-b border-rule">
-          <div className="max-w-6xl mx-auto px-5 sm:px-6 py-16 md:py-24">
-            <ScrollReveal className="max-w-2xl mb-12">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-16 md:py-24">
+            <ScrollReveal className="max-w-2xl mb-9 sm:mb-12">
               <p className="eyebrow mb-3">The product</p>
               <h2 className="font-display text-3xl md:text-[42px] font-semibold tracking-tight leading-[1.05]">
                 One briefing. Every signal that matters.
@@ -418,7 +421,7 @@ export function LandingHero() {
             <StaggerChildren className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4" stagger={0.06}>
               {FEATURES.map((f) => (
                 <StaggerItem key={f.title}>
-                  <div className="elev-1 h-full p-6 transition-shadow duration-200 hover:shadow-md">
+                  <div className="elev-1 h-full p-5 sm:p-6 transition-shadow duration-200 hover:shadow-md">
                     <IconChip>{f.svg}</IconChip>
                     <h3 className="mt-4 font-display text-[17px] font-semibold tracking-tight">{f.title}</h3>
                     <p className="mt-1.5 text-[14px] text-ink-2 leading-relaxed">{f.body}</p>
@@ -431,8 +434,8 @@ export function LandingHero() {
 
         {/* ── How it works ── */}
         <section id="how-it-works" className="scroll-mt-20 border-b border-rule bg-paper-soft">
-          <div className="max-w-6xl mx-auto px-5 sm:px-6 py-16 md:py-24">
-            <ScrollReveal className="max-w-2xl mb-12">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-16 md:py-24">
+            <ScrollReveal className="max-w-2xl mb-9 sm:mb-12">
               <p className="eyebrow mb-3">How it works</p>
               <h2 className="font-display text-3xl md:text-[42px] font-semibold tracking-tight leading-[1.05]">
                 Three steps. Sixty seconds.
@@ -442,7 +445,7 @@ export function LandingHero() {
             <StaggerChildren className="grid md:grid-cols-3 gap-4" stagger={0.08}>
               {STEPS.map((step) => (
                 <StaggerItem key={step.n}>
-                  <div className="elev-1 h-full p-6">
+                  <div className="elev-1 h-full p-5 sm:p-6">
                     <div className="flex items-center justify-between">
                       <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-signal-soft text-signal font-mono text-[13px] font-semibold">
                         {step.n}
@@ -460,9 +463,9 @@ export function LandingHero() {
 
         {/* ── Final CTA band ── */}
         <section className="border-b border-rule">
-          <div className="max-w-6xl mx-auto px-5 sm:px-6 py-16 md:py-24">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-14 sm:py-16 md:py-24">
             <ScrollReveal>
-              <div className="relative overflow-hidden rounded-2xl bg-ink text-paper px-6 py-14 md:px-16 md:py-20 text-center">
+              <div className="relative overflow-hidden rounded-2xl bg-ink text-paper px-5 py-12 sm:px-6 sm:py-14 md:px-16 md:py-20 text-center">
                 {/* Waveform motif */}
                 <svg viewBox="0 0 600 80" preserveAspectRatio="none" className="absolute inset-x-0 bottom-0 w-full h-16 text-signal opacity-30" aria-hidden="true">
                   <path
@@ -477,15 +480,15 @@ export function LandingHero() {
                   <p className="mt-4 text-[15px] md:text-[16px] text-ink-faint max-w-lg mx-auto leading-relaxed">
                     Sign up in 10 seconds, read your first briefing in 30. Free forever for 3 briefings a day.
                   </p>
-                  <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+                  <div className="mt-8 mx-auto flex max-w-xs flex-col items-stretch justify-center gap-3 sm:max-w-none sm:flex-row sm:flex-wrap sm:items-center">
                     <SignUpButton mode="modal">
-                      <MagneticButton className={`${BTN_PRIMARY} px-6 py-3 text-[14.5px]`}>
+                      <MagneticButton className={`${BTN_PRIMARY} min-h-12 w-full px-6 py-3 text-[14.5px] sm:w-auto`}>
                         Get started free
                         <ArrowRight />
                       </MagneticButton>
                     </SignUpButton>
                     <SignInButton mode="modal">
-                      <button className={`inline-flex items-center justify-center rounded-lg border border-white/25 px-5 py-3 text-[14.5px] font-medium text-paper hover:bg-white/10 transition-colors ${FOCUS}`}>
+                      <button className={`inline-flex min-h-12 w-full items-center justify-center rounded-lg border border-white/25 px-5 py-3 text-[14.5px] font-medium text-paper hover:bg-white/10 transition-colors sm:w-auto ${FOCUS}`}>
                         Sign in
                       </button>
                     </SignInButton>
@@ -498,13 +501,13 @@ export function LandingHero() {
 
         {/* ── Footer ── */}
         <footer className="bg-paper">
-          <div className="max-w-6xl mx-auto px-5 sm:px-6 py-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="flex items-center gap-2.5">
               <span className="text-signal"><SignalGlyph size={20} /></span>
               <span className="font-display text-[17px] font-semibold tracking-tight">The Signal</span>
               <span className="hidden sm:inline text-[13px] text-ink-mute">— tech intelligence, distilled.</span>
             </div>
-            <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px] text-ink-2">
+            <nav aria-label="Footer" className="grid grid-cols-2 gap-x-8 gap-y-3 text-[13px] text-ink-2 sm:flex sm:flex-wrap sm:items-center sm:gap-x-6 sm:gap-y-2">
               <a href="#features" className={`ink-link rounded-sm py-1 ${FOCUS}`}>Features</a>
               <a href="#how-it-works" className={`ink-link rounded-sm py-1 ${FOCUS}`}>How it works</a>
               <SignInButton mode="modal">
@@ -516,7 +519,7 @@ export function LandingHero() {
             </nav>
           </div>
           <div className="border-t border-rule">
-            <div className="max-w-6xl mx-auto px-5 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3 dateline">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col items-start justify-between gap-3 dateline min-[380px]:flex-row min-[380px]:items-center">
               <span>© {new Date().getFullYear()} The Signal</span>
               <span className="flex items-center gap-2"><span className="live-dot" /> All systems operational</span>
             </div>

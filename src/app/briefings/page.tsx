@@ -61,7 +61,7 @@ export default function BriefingsPage() {
   if (!isSignedIn) {
     return (
       <AppShell pageTitle="Briefings">
-        <div className="elev-1 rounded-xl p-8 max-w-md">
+        <div className="elev-1 rounded-xl p-5 sm:p-8 max-w-md">
           <p className="text-sm text-ink-mute mb-5">Sign in to view your briefings history.</p>
           <SignInButton mode="modal">
             <button className="px-4 py-2.5 rounded-lg bg-signal text-white font-semibold text-sm hover:bg-signal-deep transition-colors">
@@ -89,9 +89,10 @@ export default function BriefingsPage() {
           </div>
           <Link
             href="/"
-            className="hidden sm:inline-flex px-3.5 py-2 rounded-lg bg-signal text-white text-xs font-semibold hover:bg-signal-deep transition-colors"
+            className="inline-flex min-h-11 items-center justify-center px-3.5 py-2 rounded-lg bg-signal text-white text-xs font-semibold hover:bg-signal-deep transition-colors"
           >
-            New briefing →
+            <span className="sm:hidden">New</span>
+            <span className="hidden sm:inline">New briefing →</span>
           </Link>
         </div>
 

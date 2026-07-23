@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import {
   getAvailableOpenRouterModels,
+  getOpenRouterMaxTokens,
   getOpenRouterModelCandidates,
   getProviderKeyWarnings,
 } from "@/lib/llm";
@@ -40,7 +41,7 @@ export async function GET() {
       modelCandidates,
       availableModelCandidates: availableCandidates,
       modelIndexError,
-      maxTokens: process.env.OPENROUTER_MAX_TOKENS ?? "2000",
+      maxTokens: getOpenRouterMaxTokens(),
       firecrawlCountry: process.env.FIRECRAWL_COUNTRY ?? "US",
     },
     { status: ok ? 200 : 503 },

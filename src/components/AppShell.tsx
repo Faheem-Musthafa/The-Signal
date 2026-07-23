@@ -85,31 +85,53 @@ export function AppShell({ children, pageTitle, pageDescription, rightSlot, quot
     setMobileOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileOpen]);
+
   const usage = typeof quotaUsed === "number" ? quotaUsed : null;
   const remaining = usage !== null ? Math.max(0, quotaLimit - usage) : null;
 
   return (
-    <div className="min-h-screen bg-paper text-ink">
+    <div className="min-h-screen overflow-x-hidden bg-paper text-ink">
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-40 h-screen w-[260px] border-r border-rule bg-paper flex flex-col transition-transform duration-200 ${
+        aria-label="Primary navigation"
+        className={`fixed top-0 left-0 z-40 flex h-dvh w-[min(86vw,280px)] flex-col border-r border-rule bg-paper transition-transform duration-200 md:h-screen md:w-[260px] ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         } md:translate-x-0`}
       >
         {/* Masthead */}
-        <div className="px-5 pt-6 pb-5">
-          <div className="flex items-center gap-2.5">
-            <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-signal text-white">
-              <SignalGlyph size={18} />
-            </span>
-            <div>
-              <span className="block text-[16px] font-semibold tracking-tight leading-none">
-                The Signal
+        <div className="px-4 sm:px-5 pt-4 sm:pt-6 pb-4 sm:pb-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-signal text-white">
+                <SignalGlyph size={18} />
               </span>
-              <span className="block mt-1 text-[11px] text-ink-mute leading-none">
-                Tech intelligence
-              </span>
+              <div>
+                <span className="block text-[16px] font-semibold tracking-tight leading-none">
+                  The Signal
+                </span>
+                <span className="block mt-1 text-[11px] text-ink-mute leading-none">
+                  Tech intelligence
+                </span>
+              </div>
             </div>
+            <button
+              type="button"
+              aria-label="Close menu"
+              onClick={() => setMobileOpen(false)}
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-ink-mute hover:bg-paper-deep hover:text-ink md:hidden"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -122,7 +144,7 @@ export function AppShell({ children, pageTitle, pageDescription, rightSlot, quot
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-[13.5px] font-medium transition-colors ${
+                    className={`flex min-h-11 items-center gap-3 px-3 py-2 rounded-lg text-[13.5px] font-medium transition-colors ${
                       isActive
                         ? "text-signal bg-signal-soft"
                         : "text-ink-mute hover:text-ink hover:bg-paper-deep"
@@ -173,11 +195,11 @@ export function AppShell({ children, pageTitle, pageDescription, rightSlot, quot
 
       {/* Main */}
       <div className="md:pl-[260px] min-h-screen bg-paper-soft">
-        <header className="sticky top-0 z-20 h-14 border-b border-rule bg-paper/80 backdrop-blur-md flex items-center px-4 md:px-8">
+        <header className="sticky top-0 z-20 h-14 border-b border-rule bg-paper/80 backdrop-blur-md flex items-center px-3 sm:px-4 md:px-8">
           <button
             onClick={() => setMobileOpen(true)}
             aria-label="Open menu"
-            className="md:hidden mr-3 w-8 h-8 flex items-center justify-center rounded-lg text-ink-mute hover:text-ink hover:bg-paper-deep"
+            className="md:hidden mr-2 sm:mr-3 w-11 h-11 flex items-center justify-center rounded-lg text-ink-mute hover:text-ink hover:bg-paper-deep"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="3" y1="6" x2="21" y2="6"></line>
@@ -190,7 +212,7 @@ export function AppShell({ children, pageTitle, pageDescription, rightSlot, quot
             <h1 className="text-[15px] font-semibold tracking-tight truncate leading-none">{pageTitle}</h1>
             {pageDescription && (
               <>
-                <span className="text-ink-faint">/</span>
+                <span className="hidden sm:inline text-ink-faint">/</span>
                 <p className="text-[13px] text-ink-mute truncate hidden sm:block">{pageDescription}</p>
               </>
             )}
@@ -199,7 +221,7 @@ export function AppShell({ children, pageTitle, pageDescription, rightSlot, quot
           {rightSlot && <div className="flex items-center gap-2">{rightSlot}</div>}
         </header>
 
-        <main className="px-4 md:px-8 py-8 md:py-10 max-w-[1280px]">
+        <main className="w-full max-w-[1280px] px-4 py-6 sm:py-8 md:px-8 md:py-10">
           {children}
         </main>
       </div>

@@ -14,11 +14,11 @@ export function BriefingResult({ digest, handleShare, resetDigest }: BriefingRes
     <div>
       {/* Editorial header */}
       <ScrollReveal>
-        <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10 pb-6 border-b border-rule">
-          <div className="flex items-center gap-5">
+        <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-5 sm:gap-6 mb-8 sm:mb-10 pb-6 border-b border-rule">
+          <div className="flex items-start sm:items-center gap-3 sm:gap-5">
             <button
               onClick={resetDigest}
-              className="w-10 h-10 rounded-lg border border-rule bg-white text-ink hover:bg-paper-soft transition-colors flex items-center justify-center shrink-0"
+              className="w-11 h-11 rounded-lg border border-rule bg-white text-ink hover:bg-paper-soft transition-colors flex items-center justify-center shrink-0"
               aria-label="Back to dashboard"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -28,7 +28,7 @@ export function BriefingResult({ digest, handleShare, resetDigest }: BriefingRes
             </button>
             <div>
               <div className="eyebrow mb-2">Today&apos;s briefing</div>
-              <h1 className="font-display text-3xl md:text-4xl font-semibold tracking-tight leading-none mb-2">
+              <h1 className="font-display text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight leading-tight sm:leading-none mb-2">
                 The Signal · <span className="text-signal">Edition</span>
               </h1>
               <div className="flex flex-wrap items-center gap-2 dateline">
@@ -49,7 +49,7 @@ export function BriefingResult({ digest, handleShare, resetDigest }: BriefingRes
 
           <button
             onClick={handleShare}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-signal text-white text-[13px] font-semibold tracking-tight hover:bg-signal-deep transition-colors"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-signal text-white text-[13px] font-semibold tracking-tight hover:bg-signal-deep transition-colors sm:w-auto"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="18" cy="5" r="3"></circle>
@@ -69,18 +69,18 @@ export function BriefingResult({ digest, handleShare, resetDigest }: BriefingRes
           const isHero = i === 0;
           return (
             <StaggerItem key={i} className={isHero ? "md:col-span-2 lg:col-span-3" : ""}>
-              <article className={`bg-white border border-rule rounded-xl shadow-sm hover:shadow-md p-6 md:p-7 group flex flex-col h-full transition-shadow`}>
-                <div className="flex items-center justify-between mb-5">
-                  <div className="flex flex-wrap items-center gap-2">
+              <article className="bg-white border border-rule rounded-xl shadow-sm hover:shadow-md p-5 sm:p-6 md:p-7 group flex flex-col h-full transition-shadow">
+                <div className="flex items-start justify-between gap-3 mb-5">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
                       isHero ? "bg-signal-soft text-signal" : "bg-paper-soft border border-rule text-ink-mute"
                     }`}>
                       {story.category}
                     </span>
-                    <span className="dateline">{story.source}</span>
+                    <span className="dateline max-w-full truncate">{story.source}</span>
                   </div>
 
-                  <div className="flex gap-1" title={`Importance: ${story.importance}/5`}>
+                  <div className="flex shrink-0 gap-1 pt-1" title={`Importance: ${story.importance}/5`}>
                     {Array.from({ length: 5 }).map((_, j) => (
                       <div
                         key={j}
@@ -91,7 +91,7 @@ export function BriefingResult({ digest, handleShare, resetDigest }: BriefingRes
                 </div>
 
                 <h2 className={`font-display font-semibold mb-5 leading-tight tracking-tight ${
-                  isHero ? "text-3xl md:text-4xl max-w-4xl" : "text-xl"
+                  isHero ? "text-2xl sm:text-3xl md:text-4xl max-w-4xl" : "text-xl"
                 }`}>
                   {story.headline}
                 </h2>

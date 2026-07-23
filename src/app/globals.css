@@ -64,6 +64,12 @@
 html, body {
   background-color: var(--paper);
   color: var(--ink);
+  max-width: 100%;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -71,6 +77,21 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: "ss01", "ss02", "cv11";
+  overflow-x: hidden;
+}
+
+button,
+a,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+p,
+h1,
+h2,
+h3,
+span {
+  overflow-wrap: break-word;
 }
 
 /* ────────── Typography ────────── */

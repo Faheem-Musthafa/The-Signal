@@ -9,13 +9,10 @@ import { api } from "../../../../convex/_generated/api";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 const DIGEST_CACHE_MAX_AGE_MS = 3 * 60 * 60 * 1000;
+const DIGEST_GENERATION_TIMEOUT_MS = 45_000;
 
 function buildTopicsKey(topics: string[]) {
   return [...topics].sort().join("|");
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function parseStories(rawText: string) {
@@ -36,6 +33,7 @@ async function parseStories(rawText: string) {
 }
 
 export async function POST(req: NextRequest) {
+  const requestStartedAt = Date.now();
   let userId: string | null = null;
   try {
     const authData = await auth();
@@ -118,20 +116,45 @@ export async function POST(req: NextRequest) {
 
   let rawResponse = "";
   let model = process.env.OPENROUTER_MODEL ?? "google/gemini-2.5-flash";
+  const generationController = new AbortController();
+  const generationTimer = setTimeout(
+    () => generationController.abort(),
+    DIGEST_GENERATION_TIMEOUT_MS,
+  );
+
   try {
-    ({ content: rawResponse, model } = await runFirecrawlAndOpenRouter(topics, generatedAt));
+    ({ content: rawResponse, model } = await runFirecrawlAndOpenRouter(topics, generatedAt, {
+      signal: generationController.signal,
+    }));
   } catch (upstreamError) {
-    // Config errors (missing/swapped keys) won't heal in 5 seconds — fail fast.
     const message = upstreamError instanceof Error ? upstreamError.message : "Upstream failed";
+    const timedOut =
+      generationController.signal.aborted ||
+      /timed out/i.test(message);
+
+    console.error(
+      `[digest.route] generationFailed durationMs=${Date.now() - requestStartedAt} timedOut=${timedOut} reason=${message}`,
+    );
+
+    if (timedOut) {
+      return NextResponse.json(
+        {
+          error: "Live sources are taking too long. Please try again in a moment.",
+          code: "UPSTREAM_TIMEOUT",
+        },
+        {
+          status: 503,
+          headers: { "Retry-After": "15" },
+        },
+      );
+    }
+
     if (/env var|appears to be/.test(message)) {
       return NextResponse.json({ error: message }, { status: 500 });
     }
-    await sleep(5000);
-    try {
-      ({ content: rawResponse, model } = await runFirecrawlAndOpenRouter(topics, generatedAt));
-    } catch {
-      return NextResponse.json({ error: message }, { status: 503 });
-    }
+    return NextResponse.json({ error: message }, { status: 503 });
+  } finally {
+    clearTimeout(generationTimer);
   }
 
   let stories;

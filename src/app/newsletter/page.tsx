@@ -18,7 +18,7 @@ export default function NewsletterPage() {
   if (!isSignedIn) {
     return (
       <AppShell pageTitle="Newsletter">
-        <div className="elev-1 rounded-xl p-8 max-w-md">
+        <div className="elev-1 rounded-xl p-5 sm:p-8 max-w-md">
           <p className="text-sm text-ink-mute mb-5">Sign in to manage your newsletter subscription.</p>
           <SignInButton mode="modal">
             <button className="px-4 py-2.5 rounded-lg bg-signal text-white font-semibold text-sm hover:bg-signal-deep transition-colors">

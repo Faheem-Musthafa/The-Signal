@@ -118,7 +118,7 @@ export function SubscribeCard({ initialTopics }: SubscribeCardProps) {
 
   if (loading) {
     return (
-      <div className="bg-white border border-rule rounded-xl shadow-sm p-8 max-w-2xl">
+      <div className="bg-white border border-rule rounded-xl shadow-sm p-5 sm:p-8 max-w-2xl">
         <div className="h-4 w-48 bg-rule rounded mb-3 animate-pulse-soft" />
         <div className="h-3 w-72 bg-rule rounded animate-pulse-soft" />
       </div>
@@ -128,7 +128,7 @@ export function SubscribeCard({ initialTopics }: SubscribeCardProps) {
   return (
     <div className="space-y-8 max-w-3xl">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 pb-6 border-b border-rule">
+      <div className="flex flex-col items-start justify-between gap-4 pb-6 border-b border-rule sm:flex-row">
         <div>
           <div className="eyebrow mb-3">Newsletter</div>
           <h2 className="font-display text-3xl md:text-4xl font-semibold tracking-tight mb-2">
@@ -147,7 +147,7 @@ export function SubscribeCard({ initialTopics }: SubscribeCardProps) {
       </div>
 
       {/* Topics card */}
-      <div className="bg-white border border-rule rounded-xl shadow-sm p-6">
+      <div className="bg-white border border-rule rounded-xl shadow-sm p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="eyebrow">Topics</div>
           <span className="dateline">{topics.length}/8</span>
@@ -160,7 +160,7 @@ export function SubscribeCard({ initialTopics }: SubscribeCardProps) {
                 key={topic}
                 onClick={() => toggleTopic(topic)}
                 disabled={submitting}
-                className={`px-3.5 py-1.5 text-[12px] rounded-full border transition-colors duration-200 font-medium tracking-tight ${
+                className={`min-h-11 px-3.5 py-2 text-[12px] rounded-full border transition-colors duration-200 font-medium tracking-tight ${
                   isSelected
                     ? "bg-signal-soft text-signal border-signal/30"
                     : "bg-white border-rule text-ink-mute hover:text-ink hover:border-rule-strong"
@@ -174,10 +174,10 @@ export function SubscribeCard({ initialTopics }: SubscribeCardProps) {
       </div>
 
       {/* Schedule card */}
-      <div className="bg-white border border-rule rounded-xl shadow-sm p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white border border-rule rounded-xl shadow-sm p-4 sm:p-6">
+        <div className="flex flex-col items-start justify-between gap-1 mb-4 sm:flex-row sm:items-center sm:gap-4">
           <div className="eyebrow">Schedule</div>
-          <span className="dateline">{timezone}</span>
+          <span className="dateline break-all sm:text-right">{timezone}</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <label className="flex flex-col gap-2">
@@ -186,7 +186,7 @@ export function SubscribeCard({ initialTopics }: SubscribeCardProps) {
               value={deliveryHour}
               onChange={(e) => setDeliveryHour(Number(e.target.value))}
               disabled={submitting}
-              className="bg-white border border-rule rounded-lg px-3 py-2 text-[14px] text-ink focus:outline-none focus:border-signal focus:ring-2 focus:ring-signal/20 transition-colors"
+              className="min-h-11 bg-white border border-rule rounded-lg px-3 py-2 text-[14px] text-ink focus:outline-none focus:border-signal focus:ring-2 focus:ring-signal/20 transition-colors"
             >
               {Array.from({ length: 24 }).map((_, h) => (
                 <option key={h} value={h}>
@@ -197,7 +197,7 @@ export function SubscribeCard({ initialTopics }: SubscribeCardProps) {
           </label>
           <div className="flex flex-col gap-2">
             <span className="dateline">Cadence</span>
-            <div className="bg-paper-soft border border-rule rounded-lg px-3 py-2 text-[14px] text-ink-mute">
+            <div className="flex min-h-11 items-center bg-paper-soft border border-rule rounded-lg px-3 py-2 text-[14px] text-ink-mute">
               Every day
             </div>
           </div>
@@ -213,7 +213,7 @@ export function SubscribeCard({ initialTopics }: SubscribeCardProps) {
           <button
             onClick={handleUnsubscribe}
             disabled={submitting}
-            className="px-4 py-2.5 rounded-lg border border-rule bg-white text-ink-mute text-[13px] font-semibold tracking-tight hover:text-ink hover:bg-paper-soft disabled:opacity-40 transition-colors"
+            className="min-h-12 px-4 py-2.5 rounded-lg border border-rule bg-white text-ink-mute text-[13px] font-semibold tracking-tight hover:text-ink hover:bg-paper-soft disabled:opacity-40 transition-colors"
           >
             Unsubscribe
           </button>
@@ -221,7 +221,7 @@ export function SubscribeCard({ initialTopics }: SubscribeCardProps) {
         <button
           onClick={handleSubscribe}
           disabled={submitting || topics.length === 0}
-          className="px-6 py-2.5 rounded-lg bg-signal text-white font-semibold text-[13px] tracking-tight disabled:opacity-30 disabled:cursor-not-allowed hover:bg-signal-deep transition-colors"
+          className="min-h-12 px-6 py-2.5 rounded-lg bg-signal text-white font-semibold text-[13px] tracking-tight disabled:opacity-30 disabled:cursor-not-allowed hover:bg-signal-deep transition-colors"
         >
           {submitting ? "Saving…" : isSubscribed ? "Update preferences" : "Subscribe"}
         </button>
