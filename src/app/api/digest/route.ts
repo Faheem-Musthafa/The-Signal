@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
   }
 
   let rawResponse = "";
-  let model = process.env.OPENROUTER_MODEL ?? "google/gemini-2.5-flash";
+  let model = process.env.OPENROUTER_MODEL ?? "openrouter/free";
   const generationController = new AbortController();
   const generationTimer = setTimeout(
     () => generationController.abort(),

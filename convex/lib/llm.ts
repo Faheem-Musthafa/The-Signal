@@ -7,9 +7,10 @@ const MAX_CONTEXT_CHARS = 30000;
 const MAX_SNIPPET_CHARS = 1200;
 const FIRECRAWL_TIME_FILTER = "sbd:1,qdr:d";
 const DEFAULT_OPENROUTER_MODEL_CANDIDATES = [
-  "google/gemini-2.5-flash",
-  "google/gemini-2.0-flash-001",
-  "google/gemini-2.5-flash-lite",
+  "openrouter/free",
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "google/gemma-4-31b-it:free",
+  "google/gemma-4-26b-a4b-it:free",
 ];
 
 const TOPIC_QUERY_MAP: Record<string, string[]> = {
@@ -77,7 +78,7 @@ function parseCsvEnv(value: string | undefined) {
 }
 
 function getModelCandidates(): string[] {
-  const primary = process.env.OPENROUTER_MODEL ?? "google/gemini-2.5-flash";
+  const primary = process.env.OPENROUTER_MODEL ?? "openrouter/free";
   const configured = parseCsvEnv(process.env.OPENROUTER_MODEL_FALLBACKS);
   return [...new Set([primary, ...configured, ...DEFAULT_OPENROUTER_MODEL_CANDIDATES])];
 }
@@ -155,6 +156,9 @@ async function runOpenRouterCompletion(model: string, prompt: string, maxTokens:
       messages: [{ role: "user", content: prompt }],
       temperature: 0.2,
       max_tokens: maxTokens,
+      // Free models are mostly reasoning models; left on, they spend the whole
+      // max_tokens budget thinking and return null content (finish_reason=length).
+      reasoning: { enabled: false },
     }),
   });
 

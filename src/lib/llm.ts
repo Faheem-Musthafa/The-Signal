@@ -12,9 +12,10 @@ const OPENROUTER_TIMEOUT_MS = 28_000;
 const MAX_SEARCH_QUERIES = 8;
 const DEFAULT_OPENROUTER_MAX_TOKENS = 1600;
 const DEFAULT_OPENROUTER_MODEL_CANDIDATES = [
-  "google/gemini-2.5-flash",
-  "google/gemini-2.0-flash-001",
-  "google/gemini-2.5-flash-lite",
+  "openrouter/free",
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "google/gemma-4-31b-it:free",
+  "google/gemma-4-26b-a4b-it:free",
 ];
 
 type OpenRouterResult = {
@@ -44,7 +45,7 @@ function parseCsvEnv(value: string | undefined) {
 }
 
 export function getOpenRouterModelCandidates() {
-  const primary = process.env.OPENROUTER_MODEL ?? "google/gemini-2.5-flash";
+  const primary = process.env.OPENROUTER_MODEL ?? "openrouter/free";
   const configuredFallbacks = parseCsvEnv(process.env.OPENROUTER_MODEL_FALLBACKS);
 
   const deduped = new Set<string>([
@@ -262,6 +263,9 @@ async function runOpenRouterCompletion(
       messages: [{ role: "user", content: prompt }],
       temperature: 0.2,
       max_tokens: maxTokens,
+      // Free models are mostly reasoning models; left on, they spend the whole
+      // max_tokens budget thinking and return null content (finish_reason=length).
+      reasoning: { enabled: false },
     }),
   }, OPENROUTER_TIMEOUT_MS, "OpenRouter");
 
