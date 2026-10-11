@@ -1,195 +1,89 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { DigestRequestSchema, StorySchema } from "@/types/digest";
-import { extractJsonArray } from "@/lib/json";
-import { runFirecrawlAndOpenRouter } from "@/lib/llm";
-import { getAuthedConvexClient } from "@/lib/convexServer";
+import { DigestRequestSchema } from "@/types/digest";
+import { getAuthedConvexClient, getConvexErrorData } from "@/lib/convexServer";
 import { api } from "../../../../convex/_generated/api";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-const DIGEST_CACHE_MAX_AGE_MS = 3 * 60 * 60 * 1000;
-const DIGEST_GENERATION_TIMEOUT_MS = 45_000;
 
-function buildTopicsKey(topics: string[]) {
-  return [...topics].sort().join("|");
-}
-
-async function parseStories(rawText: string) {
-  const jsonArray = extractJsonArray(rawText);
-  if (!jsonArray) {
-    throw new Error("Model response did not contain a JSON array");
-  }
-
-  const parsed = JSON.parse(jsonArray);
-  if (!Array.isArray(parsed)) {
-    throw new Error("Model response array is invalid");
-  }
-
-  return parsed
-    .map((item) => StorySchema.safeParse(item))
-    .filter((result) => result.success)
-    .map((result) => result.data);
-}
+const STATUS_BY_CODE: Record<string, number> = {
+  UNAUTHENTICATED: 401,
+  INVALID_TOPICS: 400,
+  QUOTA_EXCEEDED: 429,
+  UPSTREAM_TIMEOUT: 503,
+  UPSTREAM_FAILED: 503,
+  BAD_MODEL_OUTPUT: 502,
+  CONFIG: 500,
+};
 
 export async function POST(req: NextRequest) {
-  const requestStartedAt = Date.now();
   let userId: string | null = null;
   try {
-    const authData = await auth();
-    userId = authData.userId;
+    userId = (await auth()).userId;
   } catch {
     return NextResponse.json(
-      { error: "Authentication is not configured correctly. Ensure Clerk proxy runs from src/proxy.ts." },
+      { error: "Authentication is not configured correctly", code: "CONFIG" },
       { status: 500 },
     );
   }
 
   if (!userId) {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    return NextResponse.json({ error: "Authentication required", code: "UNAUTHENTICATED" }, { status: 401 });
   }
 
   let body: unknown;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid JSON body", code: "INVALID_TOPICS" }, { status: 400 });
   }
 
   const validated = DigestRequestSchema.safeParse(body);
   if (!validated.success) {
     return NextResponse.json(
-      { error: "Invalid topics payload", details: validated.error.flatten() },
+      { error: "Invalid topics payload", code: "INVALID_TOPICS", details: validated.error.flatten() },
       { status: 400 },
     );
   }
 
-  const { topics } = validated.data;
-  const topicsKey = buildTopicsKey(topics);
-  const generatedAt = new Date().toISOString();
-
-  const convex = await getAuthedConvexClient();
-
-  // Serve cache first: a cached briefing must not consume daily quota.
+  let convex;
   try {
-    const cached = await convex.query(api.digests.getRecentByTopicsKey, {
-      topicsKey,
-      maxAgeMs: DIGEST_CACHE_MAX_AGE_MS,
-    });
-
-    if (cached) {
-      return NextResponse.json({
-        stories: cached.stories,
-        generatedAt: new Date(cached.generatedAt).toISOString(),
-        model: cached.model,
-        shareId: cached.shareId,
-        cached: true,
-      });
-    }
-  } catch {
-    // Cache lookup failure should not block digest generation.
+    convex = await getAuthedConvexClient();
+  } catch (error) {
+    console.error("[digest.route] convexAuthFailed", error);
+    return NextResponse.json({ error: "Backend authentication is misconfigured", code: "CONFIG" }, { status: 500 });
   }
 
-  let daily: { allowed: boolean; remaining: number; limit?: number };
   try {
-    daily = await convex.mutation(api.rateLimits.checkAndIncrementDailyByAccount, {
-      dailyMax: 3,
+    const result = await convex.action(api.generate.generateDigest, { topics: validated.data.topics });
+    return NextResponse.json({
+      stories: result.stories,
+      generatedAt: new Date(result.generatedAt).toISOString(),
+      model: result.model,
+      shareId: result.shareId,
+      cached: result.cached,
+      remaining: result.remaining,
+      limit: result.limit,
     });
   } catch (error) {
-    console.error("Daily quota check failed", error);
-    return NextResponse.json(
-      { error: "Quota service unavailable, try again shortly" },
-      { status: 503 },
-    );
-  }
-
-  if (!daily.allowed) {
-    return NextResponse.json(
-      {
-        error: "Daily limit reached (3 digests per account)",
-        remaining: 0,
-        limit: daily.limit ?? 3,
-      },
-      { status: 429 },
-    );
-  }
-
-  let rawResponse = "";
-  let model = process.env.OPENROUTER_MODEL ?? "openrouter/free";
-  const generationController = new AbortController();
-  const generationTimer = setTimeout(
-    () => generationController.abort(),
-    DIGEST_GENERATION_TIMEOUT_MS,
-  );
-
-  try {
-    ({ content: rawResponse, model } = await runFirecrawlAndOpenRouter(topics, generatedAt, {
-      signal: generationController.signal,
-    }));
-  } catch (upstreamError) {
-    const message = upstreamError instanceof Error ? upstreamError.message : "Upstream failed";
-    const timedOut =
-      generationController.signal.aborted ||
-      /timed out/i.test(message);
-
-    console.error(
-      `[digest.route] generationFailed durationMs=${Date.now() - requestStartedAt} timedOut=${timedOut} reason=${message}`,
-    );
-
-    if (timedOut) {
+    const data = getConvexErrorData(error);
+    if (!data?.code) {
+      console.error("[digest.route] unexpectedError", error);
       return NextResponse.json(
-        {
-          error: "Live sources are taking too long. Please try again in a moment.",
-          code: "UPSTREAM_TIMEOUT",
-        },
-        {
-          status: 503,
-          headers: { "Retry-After": "15" },
-        },
+        { error: "Briefing service unavailable, try again shortly", code: "UPSTREAM_FAILED" },
+        { status: 503 },
       );
     }
 
-    if (/env var|appears to be/.test(message)) {
-      return NextResponse.json({ error: message }, { status: 500 });
-    }
-    return NextResponse.json({ error: message }, { status: 503 });
-  } finally {
-    clearTimeout(generationTimer);
-  }
+    const status = STATUS_BY_CODE[data.code] ?? 500;
+    const payload: Record<string, unknown> = { error: data.message ?? "Request failed", code: data.code };
+    if (typeof data.remaining === "number") payload.remaining = data.remaining;
+    if (typeof data.limit === "number") payload.limit = data.limit;
 
-  let stories;
-  try {
-    stories = await parseStories(rawResponse);
-    if (stories.length < 2) {
-      console.warn(`[digest.parse] tooFewStories count=${stories.length} rawLen=${rawResponse.length}`);
-      return NextResponse.json(
-        { error: "Model output did not contain enough valid stories" },
-        { status: 500 },
-      );
-    }
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Invalid model output" },
-      { status: 500 },
-    );
-  }
+    const headers: Record<string, string> = {};
+    if (data.code === "UPSTREAM_TIMEOUT") headers["Retry-After"] = "15";
 
-  let shareId: string | undefined;
-  try {
-    shareId = await convex.mutation(api.digests.saveDigest, {
-      topics,
-      topicsKey,
-      stories,
-      model,
-    });
-  } catch {
-    shareId = undefined;
+    return NextResponse.json(payload, { status, headers });
   }
-
-  return NextResponse.json({
-    stories,
-    generatedAt,
-    model,
-    shareId,
-  });
 }

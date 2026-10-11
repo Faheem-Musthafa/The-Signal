@@ -4,6 +4,7 @@ import { getAuthedConvexClient } from "@/lib/convexServer";
 import { api } from "../../../../../convex/_generated/api";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const { userId } = await auth();
@@ -11,27 +12,22 @@ export async function GET() {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   }
 
-  const convex = await getAuthedConvexClient();
-  const history = await convex.query(api.digests.getTodayByAccount, { limit: 8 });
+  try {
+    const convex = await getAuthedConvexClient();
+    const history = await convex.query(api.digests.listRecentByAccount, { limit: 30 });
 
-  const uniqueByTopics = new Map<string, (typeof history)[number]>();
-  for (const item of history) {
-    const key = item.topicsKey ?? [...item.topics].sort().join("|");
-    if (!uniqueByTopics.has(key)) {
-      uniqueByTopics.set(key, item);
-    }
+    return NextResponse.json({
+      items: history.map((item) => ({
+        shareId: item.shareId,
+        topics: item.topics,
+        stories: item.stories,
+        model: item.model,
+        generatedAt: new Date(item.generatedAt).toISOString(),
+        cached: false,
+      })),
+    });
+  } catch (error) {
+    console.error("[digest.history] failed", error);
+    return NextResponse.json({ error: "Could not load briefing history" }, { status: 503 });
   }
-
-  const uniqueItems = Array.from(uniqueByTopics.values()).slice(0, 8);
-
-  return NextResponse.json({
-    items: uniqueItems.map((item) => ({
-      shareId: item.shareId,
-      topics: item.topics,
-      stories: item.stories,
-      model: item.model,
-      generatedAt: new Date(item.generatedAt).toISOString(),
-      cached: false,
-    })),
-  });
 }

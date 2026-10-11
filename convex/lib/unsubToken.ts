@@ -37,7 +37,12 @@ export async function signUnsubToken(secret: string, accountId: string): Promise
   return base64UrlEncode(sig);
 }
 
+export const MAX_ACCOUNT_ID_LENGTH = 128;
+export const MAX_UNSUB_TOKEN_LENGTH = 128;
+
 export async function verifyUnsubToken(secret: string, accountId: string, token: string): Promise<boolean> {
+  if (!accountId || accountId.length > MAX_ACCOUNT_ID_LENGTH) return false;
+  if (!token || token.length > MAX_UNSUB_TOKEN_LENGTH || !/^[A-Za-z0-9_-]+$/.test(token)) return false;
   let provided: Uint8Array;
   try {
     provided = base64UrlDecode(token);
