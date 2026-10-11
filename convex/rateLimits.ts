@@ -1,51 +1,34 @@
-import { internalMutation, mutation, type MutationCtx } from "./_generated/server";
-import { v } from "convex/values";
+import { internalMutation, internalQuery, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { ConvexError, v } from "convex/values";
 
-export const checkAndIncrement = mutation({
-  args: {
-    ip: v.string(),
-    max: v.optional(v.number()),
-    windowMs: v.optional(v.number()),
-  },
-  handler: async (ctx, { ip, max, windowMs }) => {
-    const WINDOW = windowMs ?? 60 * 60 * 1000;
-    const MAX = max ?? 10;
-    const now = Date.now();
+export const DAILY_DIGEST_LIMIT = 3;
 
-    const existing = await ctx.db
-      .query("rateLimits")
-      .withIndex("by_ip", (q) => q.eq("ip", ip))
-      .unique();
+function utcDayKey(now: number): string {
+  return new Date(now).toISOString().slice(0, 10);
+}
 
-    if (!existing || now - existing.windowStart > WINDOW) {
-      if (existing) {
-        await ctx.db.delete(existing._id);
-      }
+function nextUtcMidnight(now: number): number {
+  const d = new Date(now);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
+}
 
-      await ctx.db.insert("rateLimits", { ip, count: 1, windowStart: now });
-      return { allowed: true, remaining: MAX - 1 };
-    }
-
-    if (existing.count >= MAX) {
-      return {
-        allowed: false,
-        remaining: 0,
-        retryAfter: WINDOW - (now - existing.windowStart),
-      };
-    }
-
-    await ctx.db.patch(existing._id, { count: existing.count + 1 });
-    return { allowed: true, remaining: MAX - existing.count - 1 };
-  },
-});
+async function readUsage(ctx: QueryCtx, accountId: string, limit: number) {
+  const now = Date.now();
+  const row = await ctx.db
+    .query("dailyUsage")
+    .withIndex("by_accountId_and_dayKey", (q) => q.eq("accountId", accountId).eq("dayKey", utcDayKey(now)))
+    .unique();
+  const used = row?.count ?? 0;
+  return { used, remaining: Math.max(0, limit - used), limit, resetsAt: nextUtcMidnight(now) };
+}
 
 async function applyDailyQuota(
   ctx: MutationCtx,
   accountId: string,
   dailyMax: number,
-): Promise<{ allowed: boolean; remaining: number; limit: number }> {
+): Promise<{ allowed: boolean; remaining: number; limit: number; dayKey: string }> {
   const now = Date.now();
-  const dayKey = new Date(now).toISOString().slice(0, 10);
+  const dayKey = utcDayKey(now);
 
   const existing = await ctx.db
     .query("dailyUsage")
@@ -59,11 +42,11 @@ async function applyDailyQuota(
       count: 1,
       lastUsedAt: now,
     });
-    return { allowed: true, remaining: dailyMax - 1, limit: dailyMax };
+    return { allowed: true, remaining: dailyMax - 1, limit: dailyMax, dayKey };
   }
 
   if (existing.count >= dailyMax) {
-    return { allowed: false, remaining: 0, limit: dailyMax };
+    return { allowed: false, remaining: 0, limit: dailyMax, dayKey };
   }
 
   await ctx.db.patch(existing._id, {
@@ -71,19 +54,24 @@ async function applyDailyQuota(
     lastUsedAt: now,
   });
 
-  return { allowed: true, remaining: dailyMax - existing.count - 1, limit: dailyMax };
+  return { allowed: true, remaining: dailyMax - existing.count - 1, limit: dailyMax, dayKey };
 }
 
-export const checkAndIncrementDailyByAccount = mutation({
-  args: {
-    dailyMax: v.optional(v.number()),
-  },
-  handler: async (ctx, { dailyMax }) => {
+export const getMyUsage = query({
+  args: {},
+  handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new Error("Not authenticated");
+      throw new ConvexError({ code: "UNAUTHENTICATED", message: "Authentication required" });
     }
-    return applyDailyQuota(ctx, identity.subject, dailyMax ?? 3);
+    return readUsage(ctx, identity.subject, DAILY_DIGEST_LIMIT);
+  },
+});
+
+export const getUsageInternal = internalQuery({
+  args: { accountId: v.string() },
+  handler: async (ctx, { accountId }) => {
+    return readUsage(ctx, accountId, DAILY_DIGEST_LIMIT);
   },
 });
 
@@ -93,6 +81,24 @@ export const checkAndIncrementDailyByAccountInternal = internalMutation({
     dailyMax: v.optional(v.number()),
   },
   handler: async (ctx, { accountId, dailyMax }) => {
-    return applyDailyQuota(ctx, accountId, dailyMax ?? 3);
+    return applyDailyQuota(ctx, accountId, dailyMax ?? DAILY_DIGEST_LIMIT);
+  },
+});
+
+// Gives back one unit consumed by a generation that failed. `dayKey` is the key
+// returned at consumption time so a refund after midnight hits the right row.
+export const refundDailyQuotaInternal = internalMutation({
+  args: {
+    accountId: v.string(),
+    dayKey: v.string(),
+  },
+  handler: async (ctx, { accountId, dayKey }) => {
+    const existing = await ctx.db
+      .query("dailyUsage")
+      .withIndex("by_accountId_and_dayKey", (q) => q.eq("accountId", accountId).eq("dayKey", dayKey))
+      .unique();
+    if (!existing || existing.count <= 0) return null;
+    await ctx.db.patch(existing._id, { count: existing.count - 1 });
+    return null;
   },
 });

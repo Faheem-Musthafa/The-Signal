@@ -1,59 +1,104 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useAuth, SignInButton } from "@clerk/nextjs";
+import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from "react";
+import { motion } from "motion/react";
+import { SignInButton, SignUpButton, useAuth } from "@clerk/nextjs";
 import { AppShell } from "@/components/AppShell";
+import { StoryPlayer, useIsClient, useSavedStories, type StoryLike, type StoryMeta } from "@/components/story";
+import { Card, IconBookmark, IconBriefings, buttonClasses } from "@/components/ui";
+import { HistoryPanel, type BriefingItem, type HistoryStatus } from "./HistoryPanel";
+import { SavedPanel } from "./SavedPanel";
+import { useSeenBriefings } from "./useSeenBriefings";
 
-type BriefingItem = {
-  shareId: string;
-  topics: string[];
-  stories: Array<{
-    headline: string;
-    category: string;
-    summary: string;
-    importance: number;
-    signal: string;
-    source: string;
-  }>;
-  generatedAt: string;
-  cached?: boolean;
+type Tab = "history" | "saved";
+
+// The active tab lives in the URL hash (#saved) so other pages can deep-link to it.
+function subscribeHash(onChange: () => void) {
+  window.addEventListener("hashchange", onChange);
+  return () => window.removeEventListener("hashchange", onChange);
+}
+const getHash = () => window.location.hash;
+const getServerHash = () => "";
+
+function useHashTab(): [Tab, (tab: Tab) => void] {
+  const hash = useSyncExternalStore(subscribeHash, getHash, getServerHash);
+  const tab: Tab = hash === "#saved" ? "saved" : "history";
+  const setTab = (next: Tab) => {
+    const url = next === "saved" ? "#saved" : `${window.location.pathname}${window.location.search}`;
+    window.history.replaceState(window.history.state, "", url);
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+  };
+  return [tab, setTab];
+}
+
+type PlayerState = {
+  stories: StoryLike[];
+  meta: StoryMeta;
+  startIndex: number;
 };
 
+type HistoryState = { forUser: string | null; status: "loading" | "error" | "ready"; items: BriefingItem[] };
+
 export default function BriefingsPage() {
-  const { isLoaded, isSignedIn } = useAuth();
-  const [items, setItems] = useState<BriefingItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { isLoaded, isSignedIn, userId } = useAuth();
+  const [tab, setTab] = useHashTab();
+  const isClient = useIsClient();
+  const { saved } = useSavedStories();
+  const { isSeen, markSeen } = useSeenBriefings();
+
+  const [history, setHistory] = useState<HistoryState>({ forUser: null, status: "loading", items: [] });
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const [player, setPlayer] = useState<PlayerState | null>(null);
+  const [playerOpen, setPlayerOpen] = useState(false);
 
   useEffect(() => {
-    if (!isLoaded) return;
-    if (!isSignedIn) {
-      setLoading(false);
-      return;
-    }
-
+    if (!isLoaded || !isSignedIn || !userId) return;
     let cancelled = false;
     (async () => {
       try {
         const res = await fetch("/api/digest/history");
-        if (!res.ok) return;
-        const data = (await res.json()) as { items: BriefingItem[] };
+        if (!res.ok) {
+          if (!cancelled) setHistory({ forUser: userId, status: "error", items: [] });
+          return;
+        }
+        const data = (await res.json()) as { items?: BriefingItem[] };
         if (cancelled) return;
-        setItems(Array.isArray(data.items) ? data.items : []);
-      } finally {
-        if (!cancelled) setLoading(false);
+        setHistory({ forUser: userId, status: "ready", items: Array.isArray(data.items) ? data.items : [] });
+      } catch {
+        if (!cancelled) setHistory({ forUser: userId, status: "error", items: [] });
       }
     })();
-
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, isSignedIn]);
+  }, [isLoaded, isSignedIn, userId, reloadKey]);
+
+  // A different account (or a retry in flight) reads as loading until its own fetch lands.
+  const historyStatus: HistoryStatus = history.forUser !== userId ? "loading" : history.status;
+  const historyItems = historyStatus === "ready" ? history.items : [];
+
+  const retry = () => {
+    setHistory((h) => ({ ...h, status: "loading", forUser: null }));
+    setReloadKey((k) => k + 1);
+  };
+
+  const playSaved = (stories: StoryLike[], startIndex: number) => {
+    setPlayer({
+      stories: [...stories],
+      startIndex,
+      meta: { topics: Array.from(new Set(stories.map((s) => s.category))) },
+    });
+    setPlayerOpen(true);
+  };
 
   if (!isLoaded) {
     return (
       <AppShell pageTitle="Briefings">
-        <div className="text-sm text-ink-mute">Loading session…</div>
+        <div role="status" aria-label="Loading" className="space-y-4">
+          <div className="h-12 w-full max-w-xs rounded-full bg-surface-2 animate-pulse-soft" />
+          <div className="h-48 rounded-card bg-surface-2 animate-pulse-soft" />
+        </div>
       </AppShell>
     );
   }
@@ -61,102 +106,134 @@ export default function BriefingsPage() {
   if (!isSignedIn) {
     return (
       <AppShell pageTitle="Briefings">
-        <div className="elev-1 rounded-xl p-5 sm:p-8 max-w-md">
-          <p className="text-sm text-ink-mute mb-5">Sign in to view your briefings history.</p>
-          <SignInButton mode="modal">
-            <button className="px-4 py-2.5 rounded-lg bg-signal text-white font-semibold text-sm hover:bg-signal-deep transition-colors">
-              Sign in
-            </button>
-          </SignInButton>
-        </div>
+        <Card padding="lg" className="max-w-lg">
+          <h2 className="display-sm mb-2">Sign in to see your briefings.</h2>
+          <p className="mb-6 text-[15px] leading-relaxed text-ink-2">
+            Your History keeps every briefing you get for 30 days. Saved keeps the stories you want to read again.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <SignInButton mode="modal">
+              <button type="button" className={buttonClasses()}>
+                Sign in
+              </button>
+            </SignInButton>
+            <SignUpButton mode="modal">
+              <button type="button" className={buttonClasses({ variant: "secondary" })}>
+                Create a free account
+              </button>
+            </SignUpButton>
+          </div>
+        </Card>
       </AppShell>
     );
   }
 
-  return (
-    <AppShell
-      pageTitle="Briefings"
-      pageDescription="Your generated briefings from the last 24 hours"
-      quotaUsed={items.length}
-    >
-      <div className="animate-fade-in-up">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight mb-1">Today&apos;s briefings</h2>
-            <p className="text-sm text-ink-mute">
-              {loading ? "Loading…" : `${items.length} ${items.length === 1 ? "briefing" : "briefings"} generated in the last 24 hours.`}
-            </p>
-          </div>
-          <Link
-            href="/"
-            className="inline-flex min-h-11 items-center justify-center px-3.5 py-2 rounded-lg bg-signal text-white text-xs font-semibold hover:bg-signal-deep transition-colors"
-          >
-            <span className="sm:hidden">New</span>
-            <span className="hidden sm:inline">New briefing →</span>
-          </Link>
-        </div>
+  const historyCount = historyStatus === "ready" ? historyItems.length : null;
+  const savedCount = isClient ? saved.length : null;
 
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="elev-1 rounded-xl h-40 animate-pulse-soft" />
-            ))}
-          </div>
-        ) : items.length === 0 ? (
-          <div className="elev-1 rounded-xl py-16 px-6 flex flex-col items-center justify-center text-center">
-            <div className="w-12 h-12 rounded-lg bg-paper-deep flex items-center justify-center mb-4 text-ink-dim">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path>
-                <path d="M14 3v5h5"></path>
-              </svg>
-            </div>
-            <h3 className="text-base font-semibold mb-1">No briefings yet</h3>
-            <p className="text-sm text-ink-mute mb-5 max-w-sm">
-              Briefings expire after 24 hours. Generate a new one from the dashboard.
-            </p>
-            <Link
-              href="/"
-              className="px-4 py-2 rounded-lg bg-signal text-white text-sm font-semibold hover:bg-signal-deep transition-colors"
-            >
-              Go to dashboard
-            </Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {items.map((item) => (
-              <Link
-                key={item.shareId}
-                href={`/share/${item.shareId}`}
-                className="elev-1 rounded-xl p-5 hover:shadow-md transition-shadow group flex flex-col gap-4"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-medium leading-snug line-clamp-2">
-                    {item.topics.join(" · ")}
-                  </p>
-                  {item.cached && (
-                    <span className="shrink-0 px-2 py-0.5 rounded-full bg-moss/10 text-[9px] uppercase tracking-wider font-semibold text-moss">
-                      Cached
-                    </span>
-                  )}
-                </div>
-                {item.stories.length > 0 && (
-                  <p className="text-xs text-ink-mute line-clamp-2 leading-relaxed">
-                    {item.stories[0].headline}
-                  </p>
-                )}
-                <div className="flex items-center justify-between mt-auto pt-3 border-t border-rule">
-                  <span className="text-[11px] font-mono text-ink-dim">
-                    {new Date(item.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                  <span className="text-[11px] text-ink-mute">
-                    {item.stories.length} stories
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
+  return (
+    <AppShell pageTitle="Briefings" pageDescription="Your recent briefings and saved stories">
+      <div className="space-y-6">
+        <BriefingTabs
+          tab={tab}
+          onChange={setTab}
+          tabs={[
+            { id: "history", label: "History", count: historyCount, icon: <IconBriefings size={18} /> },
+            { id: "saved", label: "Saved", count: savedCount, icon: <IconBookmark size={18} /> },
+          ]}
+        />
+
+        <div role="tabpanel" id="panel-history" aria-labelledby="tab-history" hidden={tab !== "history"} tabIndex={-1}>
+          {tab === "history" && (
+            <HistoryPanel status={historyStatus} items={historyItems} isSeen={isSeen} onOpen={markSeen} onRetry={retry} />
+          )}
+        </div>
+        <div role="tabpanel" id="panel-saved" aria-labelledby="tab-saved" hidden={tab !== "saved"} tabIndex={-1}>
+          {tab === "saved" && <SavedPanel onPlay={playSaved} />}
+        </div>
       </div>
+
+      <StoryPlayer
+        open={playerOpen && !!player}
+        onClose={() => setPlayerOpen(false)}
+        stories={player?.stories ?? []}
+        startIndex={player?.startIndex ?? 0}
+        meta={player?.meta}
+        label="Saved stories"
+      />
     </AppShell>
+  );
+}
+
+type TabDef = { id: Tab; label: string; count: number | null; icon: ReactNode };
+
+function BriefingTabs({ tab, onChange, tabs }: { tab: Tab; onChange: (t: Tab) => void; tabs: TabDef[] }) {
+  const refs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const i = tabs.findIndex((t) => t.id === tab);
+    let next = -1;
+    if (e.key === "ArrowRight") next = (i + 1) % tabs.length;
+    else if (e.key === "ArrowLeft") next = (i - 1 + tabs.length) % tabs.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = tabs.length - 1;
+    if (next < 0) return;
+    e.preventDefault();
+    const id = tabs[next].id;
+    onChange(id);
+    refs.current[id]?.focus();
+  };
+
+  return (
+    <div
+      role="tablist"
+      aria-label="Briefings"
+      onKeyDown={onKeyDown}
+      className="inline-flex w-full rounded-full bg-surface-2 p-1 sm:w-auto"
+    >
+      {tabs.map((t) => {
+        const active = t.id === tab;
+        return (
+          <button
+            key={t.id}
+            ref={(el) => {
+              refs.current[t.id] = el;
+            }}
+            type="button"
+            role="tab"
+            id={`tab-${t.id}`}
+            aria-selected={active}
+            aria-controls={`panel-${t.id}`}
+            tabIndex={active ? 0 : -1}
+            onClick={() => onChange(t.id)}
+            className={`relative inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full px-5 text-[14.5px] font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal sm:flex-none ${
+              active ? "text-ink" : "text-ink-mute hover:text-ink"
+            }`}
+          >
+            {active && (
+              <motion.span
+                layoutId="briefings-tab-pill"
+                aria-hidden="true"
+                className="absolute inset-0 rounded-full bg-surface shadow-soft"
+                transition={{ type: "spring", stiffness: 480, damping: 38 }}
+              />
+            )}
+            <span className="relative flex items-center gap-2">
+              <span className={active ? "text-signal" : ""}>{t.icon}</span>
+              {t.label}
+              {t.count !== null && (
+                <span
+                  className={`min-w-[22px] rounded-full px-1.5 py-0.5 text-center font-mono text-[11px] tabular-nums ${
+                    active ? "bg-signal-soft text-signal" : "bg-surface-3 text-ink-mute"
+                  }`}
+                >
+                  {t.count}
+                </span>
+              )}
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }

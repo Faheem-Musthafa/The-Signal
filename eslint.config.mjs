@@ -1,17 +1,24 @@
-export default [
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
+
+export default defineConfig([
+  ...nextVitals,
+  ...nextTs,
   {
-    ignores: [".next/**", "node_modules/**", "convex/_generated/**"],
+    // Tool config files (postcss, convex auth, etc.) conventionally export an anonymous object.
+    files: ["**/*.config.{js,mjs,cjs,ts,mts}"],
+    rules: { "import/no-anonymous-default-export": "off" },
   },
-  {
-    files: ["**/*.{js,jsx,ts,tsx,mjs,cjs}"],
-    languageOptions: {
-      parser: (await import("@typescript-eslint/parser")).default,
-      parserOptions: {
-        ecmaVersion: "latest",
-        sourceType: "module",
-        ecmaFeatures: { jsx: true },
-      },
-    },
-    rules: {},
-  },
-];
+  globalIgnores([
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+    "node_modules/**",
+    "convex/_generated/**",
+    ".agents/**",
+    ".claude/**",
+    ".convex/**",
+  ]),
+]);

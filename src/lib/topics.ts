@@ -1,3 +1,5 @@
+// UI allowlist. Mirrored in convex/lib/llm.ts (TOPIC_QUERY_MAP), which is what
+// generation actually uses; Convex cannot import from src/, so keep both in sync.
 export const ALLOWED_TOPICS = [
   "AI & LLMs",
   "Startup Funding",

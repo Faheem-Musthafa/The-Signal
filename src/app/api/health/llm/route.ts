@@ -1,49 +1,27 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import {
-  getAvailableOpenRouterModels,
-  getOpenRouterMaxTokens,
-  getOpenRouterModelCandidates,
-  getProviderKeyWarnings,
-} from "@/lib/llm";
+import { getAuthedConvexClient } from "@/lib/convexServer";
+import { api } from "../../../../../convex/_generated/api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Generation runs in Convex, so the provider env vars live there; proxy the check.
 export async function GET() {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   }
 
-  const requiredEnv = ["OPENROUTER_API_KEY", "FIRECRAWL_API_KEY"];
-  const missingEnv = requiredEnv.filter((name) => !process.env[name]);
-  const modelCandidates = getOpenRouterModelCandidates();
-  const warnings = getProviderKeyWarnings();
-
-  let availableCandidates: string[] = [];
-  let modelIndexError: string | null = null;
-
   try {
-    const availableModelIds = await getAvailableOpenRouterModels();
-    availableCandidates = modelCandidates.filter((id) => availableModelIds.has(id));
+    const convex = await getAuthedConvexClient();
+    const report = await convex.action(api.health.llmHealth, {});
+    return NextResponse.json(report, { status: report.ok ? 200 : 503 });
   } catch (error) {
-    modelIndexError = error instanceof Error ? error.message : "Unknown model index error";
+    console.error("[health.llm] failed", error);
+    return NextResponse.json(
+      { ok: false, error: error instanceof Error ? error.message : "Health check failed" },
+      { status: 503 },
+    );
   }
-
-  const ok = missingEnv.length === 0 && availableCandidates.length > 0;
-
-  return NextResponse.json(
-    {
-      ok,
-      missingEnv,
-      warnings,
-      modelCandidates,
-      availableModelCandidates: availableCandidates,
-      modelIndexError,
-      maxTokens: getOpenRouterMaxTokens(),
-      firecrawlCountry: process.env.FIRECRAWL_COUNTRY ?? "US",
-    },
-    { status: ok ? 200 : 503 },
-  );
 }

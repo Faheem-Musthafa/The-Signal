@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { ConvexError } from "convex/values";
 import { SubscribeRequestSchema } from "@/types/digest";
 import { getAuthedConvexClient } from "@/lib/convexServer";
 import { api } from "../../../../convex/_generated/api";
 
 export const runtime = "nodejs";
+
+// ConvexError payloads are user-facing; anything else is an infrastructure failure.
+function errorResponse(error: unknown, fallback: string) {
+  if (error instanceof ConvexError) {
+    const message = typeof error.data === "string" ? error.data : fallback;
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
+  console.error(`[subscribe] ${error instanceof Error ? error.message : String(error)}`);
+  return NextResponse.json({ error: fallback }, { status: 503 });
+}
 
 export async function GET() {
   const { userId } = await auth();
@@ -12,10 +23,13 @@ export async function GET() {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   }
 
-  const convex = await getAuthedConvexClient();
-  const subscription = await convex.query(api.subscribers.getMySubscription, {});
-
-  return NextResponse.json({ subscription });
+  try {
+    const convex = await getAuthedConvexClient();
+    const subscription = await convex.query(api.subscribers.getMySubscription, {});
+    return NextResponse.json({ subscription });
+  } catch (error) {
+    return errorResponse(error, "Couldn't load your newsletter settings. Please try again.");
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -34,7 +48,7 @@ export async function POST(req: NextRequest) {
   const validated = SubscribeRequestSchema.safeParse(body);
   if (!validated.success) {
     return NextResponse.json(
-      { error: "Invalid subscribe payload", details: validated.error.flatten() },
+      { error: "Invalid subscription settings", details: validated.error.flatten() },
       { status: 400 },
     );
   }
@@ -45,8 +59,7 @@ export async function POST(req: NextRequest) {
     const subscription = await convex.query(api.subscribers.getMySubscription, {});
     return NextResponse.json({ subscription });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to save subscription";
-    return NextResponse.json({ error: message }, { status: 503 });
+    return errorResponse(error, "Couldn't save your subscription. Please try again.");
   }
 }
 
@@ -61,7 +74,6 @@ export async function DELETE() {
     await convex.mutation(api.subscribers.deactivateMySubscription, {});
     return NextResponse.json({ ok: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to unsubscribe";
-    return NextResponse.json({ error: message }, { status: 503 });
+    return errorResponse(error, "Couldn't unsubscribe. Please try again.");
   }
 }

@@ -10,6 +10,10 @@
 
 import type * as crons from "../crons.js";
 import type * as digests from "../digests.js";
+import type * as generate from "../generate.js";
+import type * as health from "../health.js";
+import type * as http from "../http.js";
+import type * as internal_accounts from "../internal/accounts.js";
 import type * as internal_cleanup from "../internal/cleanup.js";
 import type * as internal_showcase from "../internal/showcase.js";
 import type * as internal_subscribers from "../internal/subscribers.js";
@@ -29,6 +33,10 @@ import type {
 declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   digests: typeof digests;
+  generate: typeof generate;
+  health: typeof health;
+  http: typeof http;
+  "internal/accounts": typeof internal_accounts;
   "internal/cleanup": typeof internal_cleanup;
   "internal/showcase": typeof internal_showcase;
   "internal/subscribers": typeof internal_subscribers;

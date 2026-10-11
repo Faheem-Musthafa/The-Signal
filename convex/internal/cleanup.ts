@@ -3,6 +3,8 @@ import { internal } from "../_generated/api";
 
 const BATCH_SIZE = 100;
 const EMAIL_QUEUE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+const RATE_LIMIT_RETENTION_MS = 24 * 60 * 60 * 1000;
+const DAILY_USAGE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 export const purgeExpiredDigests = internalMutation({
   args: {},
@@ -48,5 +50,50 @@ export const purgeOldEmailQueue = internalMutation({
     }
 
     return { deleted: removed };
+  },
+});
+
+// The legacy IP rate limiter is gone; its rows only need draining.
+export const purgeStaleRateLimits = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const cutoff = Date.now() - RATE_LIMIT_RETENTION_MS;
+
+    const stale = await ctx.db
+      .query("rateLimits")
+      .withIndex("by_windowStart", (q) => q.lt("windowStart", cutoff))
+      .take(BATCH_SIZE);
+
+    for (const row of stale) {
+      await ctx.db.delete(row._id);
+    }
+
+    if (stale.length === BATCH_SIZE) {
+      await ctx.scheduler.runAfter(0, internal.internal.cleanup.purgeStaleRateLimits, {});
+    }
+
+    return { deleted: stale.length };
+  },
+});
+
+export const purgeOldDailyUsage = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const cutoff = Date.now() - DAILY_USAGE_RETENTION_MS;
+
+    const stale = await ctx.db
+      .query("dailyUsage")
+      .withIndex("by_lastUsedAt", (q) => q.lt("lastUsedAt", cutoff))
+      .take(BATCH_SIZE);
+
+    for (const row of stale) {
+      await ctx.db.delete(row._id);
+    }
+
+    if (stale.length === BATCH_SIZE) {
+      await ctx.scheduler.runAfter(0, internal.internal.cleanup.purgeOldDailyUsage, {});
+    }
+
+    return { deleted: stale.length };
   },
 });
