@@ -1,129 +1,155 @@
+import type { Metadata } from "next";
+import type { Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getConvexClient } from "@/lib/convexServer";
-import { api } from "../../../../convex/_generated/api";
+import { SITE_NAME } from "@/components/siteUrl";
+import { Button, Logo, TopicChip, IconArrowRight } from "@/components/ui";
+import { BriefingView } from "@/components/briefing/BriefingView";
+import type { Story } from "@/types/digest";
+import { getSharedDigest } from "./getSharedDigest";
+import { LocalTime } from "./LocalTime";
 
-function Mark() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 12c4 0 4-6 8-6s4 12 8 12 4-6 4-6" />
-    </svg>
-  );
+type Params = { params: Promise<{ id: string }> };
+
+function truncate(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 }
 
-export default async function SharePage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { id } = await params;
-  const convex = getConvexClient();
-  const digest = await convex.query(api.digests.getByShareId, { shareId: id });
+  const digest = await getSharedDigest(id).catch(() => null);
+
+  if (!digest || digest.stories.length === 0) {
+    return {
+      title: "Briefing not found",
+      robots: { index: false, follow: false },
+    };
+  }
+
+  const lead = digest.stories[0];
+  const title = truncate(lead.headline, 90);
+  const description = truncate(lead.signal || lead.summary, 200);
+  const url = `/share/${id}`;
+
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    robots: { index: false, follow: false },
+    openGraph: {
+      type: "article",
+      siteName: SITE_NAME,
+      url,
+      title,
+      description,
+      publishedTime: new Date(digest.generatedAt).toISOString(),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
+  };
+}
+
+export default async function SharePage({ params }: Params) {
+  const { id } = await params;
+  const digest = await getSharedDigest(id);
 
   if (!digest) notFound();
 
+  const count = digest.stories.length;
+  const topics = digest.topics.length > 0 ? digest.topics : Array.from(new Set(digest.stories.map((s) => s.category)));
+  // Stories are validated against StorySchema when they are generated.
+  const stories = digest.stories as Story[];
+
+  const header = (
+    <header className="max-w-3xl">
+      <p className="eyebrow">Shared briefing</p>
+      <h1 className="display-lg mt-3">
+        <LocalTime value={digest.generatedAt} kind="date" />
+      </h1>
+      <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[13px] tabular-nums text-ink-mute">
+        <span>
+          Made at <LocalTime value={digest.generatedAt} kind="time" />
+        </span>
+        <span aria-hidden="true" className="text-ink-faint">
+          ·
+        </span>
+        <span>
+          {count} {count === 1 ? "story" : "stories"}
+        </span>
+        <span aria-hidden="true" className="text-ink-faint">
+          ·
+        </span>
+        <span>AI-written summaries</span>
+      </p>
+      {topics.length > 0 && (
+        <ul aria-label="Topics" className="mt-4 flex flex-wrap gap-2">
+          {topics.map((t) => (
+            <li key={t}>
+              <TopicChip topic={t} variant="soft" size="md" />
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-4 text-[14px] text-ink-mute">
+        This link works until <LocalTime value={digest.expiresAt} kind="longDate" />.
+      </p>
+    </header>
+  );
+
   return (
-    <main className="min-h-screen bg-paper-soft text-ink relative overflow-hidden">
-      <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 py-7 sm:py-10 md:py-14">
-        <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-8 sm:mb-12 pb-7 sm:pb-8 border-b border-rule">
-          <div className="flex items-start gap-3 sm:gap-4">
-            <div className="w-9 h-9 rounded-lg bg-signal-soft text-signal flex items-center justify-center shrink-0 mt-1">
-              <Mark />
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-dim mb-1.5">
-                Shared briefing · The Signal
-              </p>
-              <h1 className="text-3xl md:text-4xl font-semibold tracking-tight mb-3">
-                {new Date(digest.generatedAt).toLocaleDateString("en-US", {
-                  weekday: "long",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </h1>
-              <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-ink-mute">
-                <span>{new Date(digest.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                <span className="text-ink-faint">·</span>
-                <span className="text-signal">{digest.model}</span>
-                <span className="text-ink-faint">·</span>
-                <span>{digest.topics.join(" · ")}</span>
-              </div>
-            </div>
-          </div>
+    <div className="min-h-screen bg-paper text-ink">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-full focus:bg-ink focus:px-4 focus:py-2 focus:text-white"
+      >
+        Skip to content
+      </a>
 
-          <Link
-            href="/"
-            className="inline-flex min-h-12 items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-signal text-white font-semibold text-sm hover:bg-signal-deep transition-colors"
-          >
-            Get your own briefing
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 12h14"></path>
-              <path d="m12 5 7 7-7 7"></path>
-            </svg>
-          </Link>
-        </header>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {digest.stories.map((story, i) => {
-            const isHero = i === 0;
-            return (
-              <article
-                key={i}
-                className={`elev-1 rounded-xl p-5 sm:p-6 flex flex-col group hover:shadow-md transition-shadow ${
-                  isHero ? "md:col-span-2 lg:col-span-3" : ""
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3 mb-4">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
-                      isHero ? "bg-signal-soft text-signal" : "bg-paper-soft border border-rule text-ink-mute"
-                    }`}>
-                      {story.category}
-                    </span>
-                    <span className="max-w-full truncate text-[11px] text-ink-mute">{story.source}</span>
-                  </div>
-
-                  <div className="flex shrink-0 gap-1 pt-1" title={`Importance: ${story.importance}/5`}>
-                    {Array.from({ length: 5 }).map((_, j) => (
-                      <div
-                        key={j}
-                        className={`w-1 h-1 rounded-full ${j < story.importance ? "bg-signal" : "bg-rule"}`}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <h2 className={`font-semibold mb-4 leading-snug tracking-tight ${
-                  isHero ? "text-2xl sm:text-3xl md:text-4xl max-w-3xl" : "text-base"
-                }`}>
-                  {story.headline}
-                </h2>
-
-                <div className="rounded-lg bg-signal-soft p-4 mb-4 mt-auto">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-signal mb-2">The Signal</p>
-                  <p className={`font-medium leading-relaxed text-ink ${isHero ? "text-base md:text-lg" : "text-sm"}`}>
-                    {story.signal}
-                  </p>
-                </div>
-
-                <p className={`leading-relaxed text-ink-mute ${isHero ? "text-sm md:text-base max-w-3xl" : "text-xs"}`}>
-                  {story.summary}
-                </p>
-              </article>
-            );
-          })}
+      <div className="pt-safe sticky top-0 z-30 border-b border-rule/70 bg-paper/85 backdrop-blur-md">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+          <Logo size="sm" href="/" />
+          <Button href="/" size="md" trailingIcon={<IconArrowRight />}>
+            <span className="sm:hidden">Get yours</span>
+            <span className="hidden sm:inline">Get your own briefing</span>
+          </Button>
         </div>
+      </div>
 
-        <footer className="mt-12 sm:mt-16 pt-8 border-t border-rule flex flex-col items-start justify-between gap-3 text-xs text-ink-mute min-[380px]:flex-row min-[380px]:items-center">
+      <main id="main" className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6 sm:pt-12">
+        <BriefingView
+          mode="public"
+          stories={stories}
+          meta={{ generatedAt: new Date(digest.generatedAt).toISOString(), topics, shareId: digest.shareId }}
+          header={header}
+        />
+
+        <p className="mt-10 max-w-3xl text-[13px] leading-relaxed text-ink-mute">
+          Summaries are written by AI from public sources and can contain mistakes. Check the original source before you
+          rely on a story. Nothing here is financial or investment advice.
+        </p>
+      </main>
+
+      <footer className="border-t border-rule">
+        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-3 px-4 py-6 text-[13.5px] text-ink-mute sm:flex-row sm:items-center sm:px-6">
           <span>
-            Powered by{" "}
-            <Link href="/" className="text-ink hover:text-signal transition-colors">
+            Made with{" "}
+            <Link href="/" className="ink-link">
               The Signal
             </Link>
           </span>
-          <span className="font-mono">/share/{id.slice(0, 8)}</span>
-        </footer>
-      </div>
-    </main>
+          <nav aria-label="Legal" className="flex flex-wrap items-center gap-x-5 gap-y-1">
+            <Link href={"/privacy" as Route} className="ink-link inline-flex min-h-11 items-center">
+              Privacy
+            </Link>
+            <Link href={"/terms" as Route} className="ink-link inline-flex min-h-11 items-center">
+              Terms
+            </Link>
+          </nav>
+        </div>
+      </footer>
+    </div>
   );
 }
